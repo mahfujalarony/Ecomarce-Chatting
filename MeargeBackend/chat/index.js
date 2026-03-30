@@ -1,0 +1,346 @@
+const express = require("express");
+const http = require("http");
+const cors = require("cors");
+const jwt = require("jsonwebtoken");
+const { Op } = require("sequelize");
+const axios = require("axios");
+const { Server } = require("socket.io");
+
+const { sequelize, Conversation, Message } = require("./src/models");
+const chatRoutes = require("./src/routes/chat");
+const config = require("./config/serviceConfig");
+
+const MAIN_API_BASE = config.mainApiBase;
+const origins = (config.frontendOrigins || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+const convRoom = (id) => `conv:${id}`;
+const userRoom = (id) => `user:${id}`;
+const isCoreSupportRole = (role) => ["admin", "support"].includes(role);
+const isGuestRole = (role) => role === "guest";
+const GUEST_SUPPORT_AUTO_REPLY_TEXT =
+  "We have received your message. One of our representatives will reply to you very soon. Please wait.";
+const SUPPORT_AUTO_REPLY_SENDER_ID = config.supportAutoReplySenderId;
+const parseUserIdFromRoom = (roomName) =>
+  roomName.startsWith("user:") ? roomName.replace("user:", "") : null;
+const supportPermCache = new Map();
+
+async function canSubAdminManageSupport(userId, token) {
+  const key = String(userId);
+  const now = Date.now();
+  const cached = supportPermCache.get(key);
+  if (cached && cached.expiresAt > now) return cached.allowed;
+
+  try {
+    const res = await axios.get(`${MAIN_API_BASE}/api/admin/subadmin/me/permissions`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const allowed = !!res.data?.permissions?.includes("manage_support_chat");
+    supportPermCache.set(key, { allowed, expiresAt: now + 30_000 });
+    return allowed;
+  } catch {
+    supportPermCache.set(key, { allowed: false, expiresAt: now + 5_000 });
+    return false;
+  }
+}
+
+async function canManageSupportSocket(socket) {
+  const role = socket.user?.role;
+  if (isCoreSupportRole(role)) return true;
+  if (role === "subadmin") {
+    return canSubAdminManageSupport(socket.user?.id, socket.authToken);
+  }
+  return false;
+}
+
+const isConversationParticipant = (convo, socketUser) => {
+  const userId = socketUser?.id;
+  const baseParticipant =
+    String(convo.customerId) === String(userId) || String(convo.agentId) === String(userId);
+  if (!baseParticipant) return false;
+  if (!isGuestRole(socketUser?.role)) return true;
+  return (
+    !!convo.isGuestCustomer &&
+    !!socketUser?.guestSessionKey &&
+    String(convo.guestSessionKey) === String(socketUser.guestSessionKey)
+  );
+};
+
+function registerSupportChatSockets(io) {
+  const getOnlineUserIds = () =>
+    [...io.sockets.adapter.rooms.keys()]
+      .map(parseUserIdFromRoom)
+      .filter(Boolean);
+
+  const emitOnlineUsers = () => {
+    io.emit("online_users", { userIds: [...new Set(getOnlineUserIds())] });
+  };
+
+  const emitSupportPingToTeam = async (conversationId) => {
+    const ids = new Set();
+
+    for (const s of io.sockets.sockets.values()) {
+      const canManage = await canManageSupportSocket(s);
+      if (canManage && s.user?.id) {
+        ids.add(String(s.user.id));
+      }
+    }
+
+    ids.forEach((id) => {
+      io.to(userRoom(id)).emit("conversation_ping", { conversationId });
+    });
+  };
+
+  io.use((socket, next) => {
+    try {
+      const token =
+        socket.handshake.auth?.token ||
+        (socket.handshake.headers.authorization || "").replace("Bearer ", "");
+
+      if (!token) return next(new Error("Unauthorized"));
+
+      const payload = jwt.verify(token, config.jwtSecret);
+      if (!payload?.id) return next(new Error("Invalid token payload"));
+
+      socket.user = payload;
+      socket.authToken = token;
+      next();
+    } catch {
+      next(new Error("Unauthorized"));
+    }
+  });
+
+  io.on("connection", (socket) => {
+    const user = socket.user;
+
+    socket.join(userRoom(user.id));
+    emitOnlineUsers();
+    io.emit("user_presence", { userId: user.id, online: true });
+
+    socket.on("join_conversation", async ({ conversationId }, ack) => {
+      try {
+        const convoId = Number(conversationId);
+        if (!convoId) return ack?.({ ok: false, message: "conversationId required" });
+
+        const convo = await Conversation.findByPk(convoId);
+        if (!convo) return ack?.({ ok: false, message: "Conversation not found" });
+        if (convo.contextType !== "support") {
+          return ack?.({ ok: false, message: "Only support conversations are allowed" });
+        }
+
+        const isParticipant = isConversationParticipant(convo, user);
+        const canManageSupport = await canManageSupportSocket(socket);
+        const canJoin = isParticipant || canManageSupport;
+        if (!canJoin) return ack?.({ ok: false, message: "Forbidden" });
+
+        socket.join(convRoom(convoId));
+        ack?.({ ok: true });
+      } catch {
+        ack?.({ ok: false, message: "Server error" });
+      }
+    });
+
+    socket.on("send_message", async (payload, ack) => {
+      try {
+        const { conversationId, type = "text", body = null, mediaUrl = null, meta = null } = payload || {};
+        const convoId = Number(conversationId);
+        if (!convoId) return ack?.({ ok: false, message: "conversationId required" });
+
+        const convo = await Conversation.findByPk(convoId);
+        if (!convo) return ack?.({ ok: false, message: "Conversation not found" });
+        if (convo.contextType !== "support") {
+          return ack?.({ ok: false, message: "Only support conversations are allowed" });
+        }
+
+        const isParticipant = isConversationParticipant(convo, user);
+        const canManageSupport = await canManageSupportSocket(socket);
+        const canSend = isParticipant || canManageSupport;
+        if (!canSend) return ack?.({ ok: false, message: "Forbidden" });
+        if (convo.isBlocked && !canManageSupport) {
+          return ack?.({ ok: false, message: "This chat is blocked by admin" });
+        }
+
+        if (type === "text" && (!body || !String(body).trim())) {
+          return ack?.({ ok: false, message: "Message body required" });
+        }
+        if ((type === "image" || type === "file") && !mediaUrl) {
+          return ack?.({ ok: false, message: "mediaUrl required" });
+        }
+
+        const msg = await Message.create({
+          conversationId: convoId,
+          senderId: user.id,
+          type,
+          body: body ? String(body) : null,
+          mediaUrl,
+          meta,
+          deliveredAt: new Date(),
+        });
+
+        let latestMessageAt = new Date();
+        await convo.update({ lastMessageAt: latestMessageAt });
+        io.to(convRoom(convoId)).emit("new_message", { message: msg });
+
+        const isGuestSupportCustomer =
+          isGuestRole(user?.role) &&
+          !!convo.isGuestCustomer &&
+          String(convo.customerId) === String(user?.id);
+
+        if (isGuestSupportCustomer) {
+          const guestSentCount = await Message.count({
+            where: {
+              conversationId: convoId,
+              senderId: user.id,
+            },
+          });
+
+          if (guestSentCount === 1) {
+            const autoReply = await Message.create({
+              conversationId: convoId,
+              senderId: convo.agentId || SUPPORT_AUTO_REPLY_SENDER_ID,
+              type: "text",
+              body: GUEST_SUPPORT_AUTO_REPLY_TEXT,
+              mediaUrl: null,
+              meta: { autoReply: true, source: "guest-first-message" },
+              deliveredAt: new Date(),
+            });
+
+            latestMessageAt = autoReply.createdAt || new Date();
+            await convo.update({ lastMessageAt: latestMessageAt });
+            io.to(convRoom(convoId)).emit("new_message", { message: autoReply });
+          }
+        }
+
+        io.to(userRoom(String(convo.customerId))).emit("conversation_ping", { conversationId: convoId });
+        if (convo.agentId) io.to(userRoom(String(convo.agentId))).emit("conversation_ping", { conversationId: convoId });
+        if (convo.contextType === "support") {
+          void emitSupportPingToTeam(convoId);
+        }
+
+        ack?.({ ok: true, message: msg });
+      } catch {
+        ack?.({ ok: false, message: "Server error" });
+      }
+    });
+
+    socket.on("typing", ({ conversationId, isTyping }) => {
+      const convoId = Number(conversationId);
+      if (!convoId) return;
+      socket.to(convRoom(convoId)).emit("typing", {
+        conversationId: convoId,
+        userId: user.id,
+        isTyping: !!isTyping,
+      });
+    });
+
+    socket.on("mark_read", async ({ conversationId }, ack) => {
+      try {
+        const convoId = Number(conversationId);
+        if (!convoId) return ack?.({ ok: false, message: "conversationId required" });
+
+        const convo = await Conversation.findByPk(convoId);
+        if (!convo) return ack?.({ ok: false, message: "Conversation not found" });
+        if (convo.contextType !== "support") {
+          return ack?.({ ok: false, message: "Only support conversations are allowed" });
+        }
+
+        const isParticipant =
+          String(convo.customerId) === String(user.id) ||
+          String(convo.agentId) === String(user.id) ||
+          (isGuestRole(user?.role) &&
+            !!convo.isGuestCustomer &&
+            !!user?.guestSessionKey &&
+            String(convo.guestSessionKey) === String(user.guestSessionKey));
+        const canManageSupport = await canManageSupportSocket(socket);
+        const canRead = isParticipant || canManageSupport;
+        if (!canRead) return ack?.({ ok: false, message: "Forbidden" });
+
+        const now = new Date();
+        await Message.update(
+          { readAt: now },
+          {
+            where: {
+              conversationId: convoId,
+              senderId: { [Op.ne]: user.id },
+              readAt: null,
+            },
+          }
+        );
+
+        io.to(convRoom(convoId)).emit("read_receipt", {
+          conversationId: convoId,
+          userId: user.id,
+          readAt: now,
+        });
+
+        ack?.({ ok: true });
+      } catch {
+        ack?.({ ok: false, message: "Server error" });
+      }
+    });
+
+    socket.on("disconnect", () => {
+      const room = io.sockets.adapter.rooms.get(userRoom(user.id));
+      const stillOnline = !!(room && room.size > 0);
+      if (!stillOnline) {
+        io.emit("user_presence", { userId: user.id, online: false });
+        emitOnlineUsers();
+      }
+    });
+  });
+}
+
+function createSupportChatApp({ ioNamespace } = {}) {
+  const app = express();
+
+  app.use(
+    cors({
+      origin: origins.length ? origins : true,
+      credentials: true,
+    })
+  );
+  app.use(express.json({ limit: "2mb" }));
+
+  app.get("/", (req, res) => res.json({ ok: true, service: "support-chat" }));
+  app.use("/api/chat", chatRoutes);
+
+  if (ioNamespace) {
+    app.set("io", ioNamespace);
+    registerSupportChatSockets(ioNamespace);
+  }
+
+  return app;
+}
+
+async function syncSupportChatDatabase() {
+  await sequelize.authenticate();
+  await sequelize.sync({ alter: true });
+}
+
+async function startStandaloneServer() {
+  await syncSupportChatDatabase();
+
+  const app = createSupportChatApp();
+  const server = http.createServer(app);
+  const io = new Server(server, {
+    cors: { origin: origins.length ? origins : true, credentials: true },
+  });
+  app.set("io", io);
+  registerSupportChatSockets(io);
+
+  server.listen(config.port, () => console.log("Support chat server running on", config.port));
+}
+
+if (require.main === module) {
+  startStandaloneServer().catch(() => {
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  createSupportChatApp,
+  registerSupportChatSockets,
+  syncSupportChatDatabase,
+  startStandaloneServer,
+};

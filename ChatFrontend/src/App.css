@@ -1,0 +1,142 @@
+.chat-wallpaper {
+  background-color: #efeae2;
+  background-image:
+    radial-gradient(circle at 25px 25px, rgba(255, 255, 255, 0.45) 2px, transparent 0),
+    radial-gradient(circle at 75px 75px, rgba(0, 0, 0, 0.04) 2px, transparent 0);
+  background-size: 100px 100px;
+}
+
+/* WhatsApp style message bubbles */
+.message-bubble {
+  position: relative;
+  max-width: 100%;
+  padding: 6px 7px 8px 9px;
+  border-radius: 7.5px;
+  box-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.13);
+}
+
+.message-bubble.sent {
+  background-color: #d9fdd3;
+  border-top-right-radius: 0;
+  margin-left: auto;
+}
+
+.message-bubble.internal-history {
+  background-color: #e8f1ff;
+  box-shadow: 0 1px 0.5px rgba(40, 90, 160, 0.16);
+}
+
+.message-bubble.received {
+  background-color: #ffffff;
+  border-top-left-radius: 0;
+  margin-right: auto;
+}
+
+/* Message tail for sent messages */
+.message-bubble.sent::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: -8px;
+  width: 0;
+  height: 0;
+  border-left: 8px solid #d9fdd3;
+  border-top: 8px solid transparent;
+}
+
+.message-bubble.internal-history::before {
+  border-left-color: #e8f1ff;
+}
+
+/* Message tail for received messages */
+.message-bubble.received::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -8px;
+  width: 0;
+  height: 0;
+  border-right: 8px solid #ffffff;
+  border-top: 8px solid transparent;
+}
+
+/* Messages container */
+.messages-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  justify-content: flex-end;
+}
+
+/* Scrollbar styling */
+.chat-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.chat-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Keep Zego call UI fully visible on mobile browsers */
+.zego-call-mobile-fix,
+.zego-call-mobile-fix * {
+  box-sizing: border-box;
+}
+
+.call-overlay {
+  min-height: 100dvh;
+  min-height: 100svh;
+}
+
+@media (max-width: 767px) {
+  .zego-call-mobile-fix {
+    height: 100dvh;
+    width: 100vw;
+    overflow: hidden;
+  }
+}
+
+@media (max-width: 420px) {
+  .call-overlay-actions {
+    gap: 1.25rem;
+  }
+}
+
+@media (max-width: 767px) and (orientation: landscape) and (max-height: 560px) {
+  .call-overlay {
+    min-height: 100dvh;
+  }
+
+  .call-overlay .relative.z-10 {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-top: max(12px, env(safe-area-inset-top));
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+
+  .call-overlay .relative.z-10 > :first-child,
+  .call-overlay .relative.z-10 > :last-child {
+    flex: 1 1 0;
+  }
+
+  .call-overlay .relative.z-10 > :first-child {
+    text-align: left;
+  }
+
+  .call-overlay .relative.z-10 > :last-child {
+    display: flex;
+    justify-content: center;
+  }
+
+  .call-overlay .call-overlay-actions {
+    max-width: 18rem;
+    margin-left: auto;
+  }
+}
