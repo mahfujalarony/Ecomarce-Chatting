@@ -47,7 +47,7 @@ const extractUrl = (d) => {
   return [];
 };
 
-const MerchantRegistration = () => {
+const MerchantRegistration = ({ onSubmitted }) => {
   const { control, handleSubmit, reset, watch, formState: { errors, isSubmitting } } = useForm({
     defaultValues: {
       YourAddress: "",
@@ -208,6 +208,9 @@ const MerchantRegistration = () => {
       setFrontFile(null);
       setBackFile(null);
       setSubmitAttempted(false);
+      if (typeof onSubmitted === "function") {
+        await onSubmitted();
+      }
     } catch (err) {
       message.error(err?.response?.data?.message || err.message || "Something went wrong");
     } finally {

@@ -278,7 +278,6 @@ exports.getHomeSections = async (req, res) => {
                    "category", "subCategory", "merchantId",
                    "averageRating", "totalReviews", "createdAt"],
       order: [["createdAt", "DESC"]],
-      limit: 400,
     });
 
     const allInStockJson = allInStockRows.map((p) => ({

@@ -19,12 +19,6 @@ const asMoney = (v) => {
   return n.toFixed(2);
 };
 
-const normalizeTransactionId = (value) =>
-  String(value || "")
-    .trim()
-    .replace(/\s+/g, "")
-    .toUpperCase();
-
 // ✅ client: active mobile bankings
 exports.clientListMobileBankings = async (req, res) => {
   try {
@@ -131,26 +125,6 @@ exports.createTopupRequest = async (req, res) => {
     if (!isNonEmpty(transactionId)) {
       return res.status(400).json({ success: false, message: "transactionId is required" });
     }
-    const txId = normalizeTransactionId(transactionId);
-    if (!txId) {
-      return res.status(400).json({ success: false, message: "transactionId is required" });
-    }
-
-    // Same TX ID can be reused only if previous requests are rejected.
-    // Any existing pending/approved record with same TX ID blocks new request.
-    const txExists = await BalanceTopupRequest.findOne({
-      where: {
-        transactionId: txId,
-        mobileBankingId: Number(mobileBankingId),
-        status: { [Op.in]: ["pending", "approved"] },
-      },
-    });
-    if (txExists) {
-      return res.status(409).json({
-        success: false,
-        message: "This transaction ID is already used in a pending/approved request for this provider",
-      });
-    }
 
     // validate provider/wallet/number chain & active
     const provider = await MobileBanking.findByPk(mobileBankingId);
@@ -192,7 +166,7 @@ exports.createTopupRequest = async (req, res) => {
       walletNumberId: wnum.id,
       senderNumber: senderNumber.trim(),
       amount: usdAmount,
-      transactionId: txId,
+      transactionId,
       status: "pending",
     });
 
@@ -217,12 +191,6 @@ exports.createTopupRequest = async (req, res) => {
 
     res.json({ success: true, message: "Topup request submitted", data: row });
   } catch (err) {
-    if (err?.name === "SequelizeUniqueConstraintError") {
-      return res.status(409).json({
-        success: false,
-        message: "This transaction ID is already used in a pending/approved request",
-      });
-    }
     res.status(500).json({ success: false, message: "Server error" });
   }
 };

@@ -3,7 +3,7 @@ const trimSlash = (v = "") => String(v || "").replace(/\/+$/, "");
 
 // Backend Url
 
-const UNIFIED_BASE_URL = trimSlash("http://localhost:3000");
+const UNIFIED_BASE_URL = trimSlash("https://server.nexusglobalshop.com");
 
 export const API_BASE_URL = trimSlash(UNIFIED_BASE_URL);
 export const API_BASE_PATH = trimSlash(`${API_BASE_URL}/api`);

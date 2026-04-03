@@ -171,7 +171,7 @@ const MerchantDashboardGate = () => {
 
   // ✅ no request => show apply form
   if (!merchant) {
-    return <NewMarchentForm />;
+    return <NewMarchentForm onSubmitted={() => fetchMerchant(false)} />;
   }
 
   // ✅ pending => wait screen

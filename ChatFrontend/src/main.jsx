@@ -4,6 +4,7 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom
 import './index.css'
 import App from './App.jsx'
 import { clearAccessToken, fetchJsonWithAuth, getAccessToken, refreshSession, subscribeToAuth } from './lib/auth'
+import { registerServiceWorker } from './pwa/registerServiceWorker.js'
 
 import Admin from './components/admin/AdminPage.jsx'
 import ModelAdmin from './components/model_admin/ModelAdmin.jsx'
@@ -98,6 +99,8 @@ function RoleRoute({ children, allowRoles = [], allowUnauthenticated = false }) 
   if (allowRoles.includes(role)) return children || <Outlet />
   return <Navigate to={defaultRouteForUser(state.user)} replace />
 }
+
+registerServiceWorker()
 
 
 createRoot(document.getElementById('root')).render(

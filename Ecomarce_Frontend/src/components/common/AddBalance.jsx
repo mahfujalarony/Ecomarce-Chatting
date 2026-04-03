@@ -26,11 +26,6 @@ const { Title, Text } = Typography;
 const API = `${API_BASE_URL}/api`;
 const CHAT_API = CHAT_API_BASE_URL;
 const safeArr = (v) => (Array.isArray(v) ? v : []);
-const normalizeTransactionId = (value) =>
-  String(value || "")
-    .trim()
-    .replace(/\s+/g, "")
-    .toUpperCase();
 
 export default function AddBalance() {
   const reduxToken = useSelector((state) => state.auth?.token);
@@ -279,7 +274,6 @@ export default function AddBalance() {
 
     try {
       setSubmitting(true);
-      const txId = normalizeTransactionId(values.transactionId);
       await axios.post(
         `${API}/balance/topup`,
         {
@@ -288,7 +282,7 @@ export default function AddBalance() {
           walletNumberId,
           senderNumber: values.senderNumber?.trim(),
           amount: values.amount,
-          transactionId: txId,
+          transactionId: values.transactionId,
         },
         { headers: authHeaders }
       );
@@ -300,14 +294,7 @@ export default function AddBalance() {
       // ✅ submit এর পর pending refresh
       loadPending();
     } catch (e) {
-      if (Number(e?.response?.status) === 409) {
-        message.error(
-          e?.response?.data?.message ||
-            "This transaction ID is already used in pending/approved request. Rejected one can be resubmitted."
-        );
-      } else {
-        message.error(e?.response?.data?.message || "Submit failed");
-      }
+      message.error(e?.response?.data?.message || "Submit failed");
     } finally {
       setSubmitting(false);
     }
@@ -644,22 +631,15 @@ export default function AddBalance() {
                 { required: true, message: "Transaction ID required" },
                 {
                   validator: (_, value) => {
-                    const txId = normalizeTransactionId(value);
-                    if (!txId) return Promise.reject(new Error("Transaction ID required"));
-                    if (txId.length < 6) return Promise.reject(new Error("Transaction ID too short"));
-                    if (txId.length > 120) return Promise.reject(new Error("Transaction ID too long"));
+                    if (typeof value !== "string" || !value.trim()) {
+                      return Promise.reject(new Error("Transaction ID required"));
+                    }
                     return Promise.resolve();
                   },
                 },
               ]}
             >
-              <Input
-                placeholder="e.g. 9F8A7B..."
-                onBlur={(e) => {
-                  const txId = normalizeTransactionId(e.target.value);
-                  form.setFieldValue("transactionId", txId);
-                }}
-              />
+              <Input placeholder="e.g. 9F8A7B..." />
             </Form.Item>
 
             <Button

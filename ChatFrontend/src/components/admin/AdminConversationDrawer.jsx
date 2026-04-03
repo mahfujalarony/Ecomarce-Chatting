@@ -12,7 +12,7 @@ function resolveMediaUrl(rawUrl = '') {
   if (/^https?:\/\//i.test(raw)) return raw
   if (raw.startsWith('//')) return `${window.location.protocol}${raw}`
 
-  const preferredBase = String(UPLOAD_SERVER_URL || API_URL || window.location.origin || '').trim()
+  const preferredBase = String(UPLOAD_SERVER_URL || API_URL || '').trim()
   if (!preferredBase) return raw
   try {
     return new URL(raw, preferredBase).toString()

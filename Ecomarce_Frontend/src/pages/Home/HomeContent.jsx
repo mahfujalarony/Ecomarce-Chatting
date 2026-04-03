@@ -13,6 +13,7 @@ import { MoveRight } from "lucide-react";
 import { normalizeImageUrl } from "../../utils/imageUrl";
 import { canAddToCart } from "../../utils/cartAddGuard";
 import { animateAddToCart, bumpCartBadge } from "../../utils/cartAnimation";
+import defaultBanner from "../../public/default_banner.png";
 const { useBreakpoint } = Grid;
 const HOME_CACHE_TTL = Math.max(1, Number(HOME_CACHE_TTL_SECONDS || 120)) * 1000;
 
@@ -559,14 +560,15 @@ const HomeContent = () => {
               </button>
             </div>
           ) : (
-            <div className="h-[200px] sm:h-[290px] md:h-[340px] lg:h-[360px] xl:h-[380px] bg-gradient-to-br from-slate-800 via-slate-700 to-slate-600 text-white grid place-items-center">
-              <div className="text-center space-y-2">
-                <p className="text-xs uppercase tracking-[0.2em] opacity-60 font-medium">Welcome</p>
-                <h3 className="text-2xl font-extrabold">Discover Products</h3>
-                <Link to="/products" className="inline-flex items-center gap-1.5 mt-2 bg-white/15 hover:bg-white/25 border border-white/20 rounded-full px-4 py-1.5 text-sm font-semibold transition-colors">
-                  Browse All <MoveRight size={15} />
-                </Link>
-              </div>
+            <div className="relative h-[200px] sm:h-[320px] md:h-[420px] lg:h-[480px] xl:h-[560px] overflow-hidden bg-white">
+              <LazyImg
+                src={defaultBanner}
+                alt="Default banner"
+                loading="eager"
+                fetchPriority="high"
+                className="absolute inset-0 w-full h-full"
+                imgClassName="object-contain"
+              />
             </div>
           )}
         </div>
@@ -726,30 +728,28 @@ const HomeContent = () => {
         )}
       </div>
 
-      <div className="px-4 md:px-6 my-8">
-        <div className="flex justify-between items-end mb-5">
-          <div>
-            <h2 className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-600 to-cyan-500 tracking-tight">Special Offers</h2>
-            <p className="text-xs text-gray-600 mt-1">Exclusive deals for you</p>
+      {(offersLoading || offers.length > 0) ? (
+        <div className="px-4 md:px-6 my-8">
+          <div className="flex justify-between items-end mb-5">
+            <div>
+              <h2 className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-600 to-cyan-500 tracking-tight">Special Offers</h2>
+              <p className="text-xs text-gray-600 mt-1">Exclusive deals for you</p>
+            </div>
+
+            <button type="button" className="text-sm font-medium text-gray-500 cursor-default" title="Preview only">
+              Preview
+            </button>
           </div>
 
-          <button type="button" className="text-sm font-medium text-gray-500 cursor-default" title="Preview only">
-            Preview
-          </button>
-        </div>
-
-        {offersLoading ? (
-          <div className="flex overflow-x-auto gap-4 pb-2 scrollbar-hide">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <OfferSkeleton key={i} index={i} />
-            ))}
-          </div>
-        ) : (
-          <div className="flex overflow-x-auto gap-4 pb-2 scrollbar-hide snap-x">
-            {offers.length === 0 ? (
-              <p className="text-gray-500">No offers yet</p>
-            ) : (
-              offers.map((o) => (
+          {offersLoading ? (
+            <div className="flex overflow-x-auto gap-4 pb-2 scrollbar-hide">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <OfferSkeleton key={i} index={i} />
+              ))}
+            </div>
+          ) : (
+            <div className="flex overflow-x-auto gap-4 pb-2 scrollbar-hide snap-x">
+              {offers.map((o) => (
                 <div
                   key={o.id}
                   onClick={() => setSelectedOffer(o)}
@@ -767,20 +767,19 @@ const HomeContent = () => {
                     {o.title}
                   </div>
                 </div>
-              ))
-            )}
-          </div>
-        )}
-      </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
 
-      <div className="px-4 md:px-6">
-        <div className="rounded-2xl border border-white/80 bg-white/75 backdrop-blur p-3 md:p-4 shadow-sm">
-          <div className="flex justify-between items-end mb-4">
+      <section className="px-4 md:px-6 py-2 md:py-3">
+          <div className="flex justify-between items-end gap-3 mb-4 md:mb-5">
             <div>
-              <span className="text-xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-sky-600 to-emerald-500">
+              <span className="text-2xl md:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-sky-600 to-emerald-500">
                 🛍️ Our Products
               </span>
-              <p className="text-xs text-gray-500 mt-0.5">Handpicked products from various categories</p>
+              <p className="text-sm text-gray-500 mt-1">Handpicked products from various categories</p>
             </div>
             <Link
               to="/products"
@@ -791,7 +790,7 @@ const HomeContent = () => {
           </div>
 
           {productsLoading ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 md:gap-4 mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-5 mb-6">
               {Array.from({ length: 12 }).map((_, i) => (
                 <ProductSkeleton key={i} index={i} imgClass="h-28 md:h-44" />
               ))}
@@ -808,23 +807,17 @@ const HomeContent = () => {
                 grouped[cat].push(p);
               }
               return (
-                <div className="space-y-8">
+                <div className="space-y-8 md:space-y-10">
                   {Object.entries(grouped).map(([cat, catProducts]) => (
                     <div key={cat}>
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                           <span className="w-1 h-5 rounded-full bg-gradient-to-b from-sky-500 to-emerald-500 inline-block" />
-                          <span className="text-base font-bold text-gray-800 capitalize">{cat}</span>
+                          <span className="text-lg font-bold text-gray-800 capitalize">{cat}</span>
                           <span className="text-xs text-gray-400">({catProducts.length})</span>
                         </div>
-                        <Link
-                          to={`/${cat.toLowerCase().replace(/\s+/g, "-")}`}
-                          className="text-xs text-blue-500 hover:text-blue-700 flex items-center gap-0.5"
-                        >
-                          See all <MoveRight size={14} />
-                        </Link>
                       </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 md:gap-4">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-5">
                         {catProducts.map((p) => (
                           <ProductCard
                             key={p.id}
@@ -839,6 +832,15 @@ const HomeContent = () => {
                             onProductClick={() => handleProductCardOpen(p)}
                           />
                         ))}
+                      </div>
+                      <div className="mt-4 flex justify-center sm:justify-start">
+                        <Link
+                          to={`/${cat.toLowerCase().replace(/\s+/g, "-")}`}
+                          className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-gradient-to-r from-sky-50 to-emerald-50 px-4 py-2 text-sm font-semibold text-sky-700 shadow-sm transition-all hover:-translate-y-0.5 hover:border-sky-300 hover:text-sky-900 hover:shadow"
+                        >
+                          View {cat}
+                          <MoveRight size={16} />
+                        </Link>
                       </div>
                     </div>
                   ))}
@@ -855,8 +857,7 @@ const HomeContent = () => {
               View All Products <MoveRight size={17} />
             </Link>
           </div>
-        </div>
-      </div>
+      </section>
 
       <Footer />
 

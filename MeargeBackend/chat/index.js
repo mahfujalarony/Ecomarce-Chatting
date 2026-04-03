@@ -315,7 +315,7 @@ function createSupportChatApp({ ioNamespace } = {}) {
 
 async function syncSupportChatDatabase() {
   await sequelize.authenticate();
-  await sequelize.sync({ alter: true });
+  await sequelize.sync();
 }
 
 async function startStandaloneServer() {

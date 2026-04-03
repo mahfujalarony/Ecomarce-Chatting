@@ -405,7 +405,7 @@ function ChatSidebar({
               <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#25d366] text-white">
                 <UserPlus size={20} />
               </span>
-              <span className="text-lg font-medium text-[#111b21]">New contact</span>
+              <span className="text-lg font-medium text-[#111b21]">Add Friend</span>
             </button>
           </div>
 

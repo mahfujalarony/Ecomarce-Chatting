@@ -185,8 +185,29 @@ function App({ portalRole = 'user' }) {
     return base
   }
 
+  const normalizeAssetUrl = (value) => {
+    if (typeof value !== 'string') return ''
+    const trimmed = value.trim()
+    if (!trimmed) return ''
+    if (/^https?:\/\//i.test(trimmed)) return trimmed
+    if (trimmed.startsWith('//')) return `${window.location.protocol}${trimmed}`
+    if (trimmed.startsWith('/')) return `${UPLOAD_SERVER_URL}${trimmed}`
+    if (trimmed.startsWith('public/')) return `${UPLOAD_SERVER_URL}/${trimmed}`
+    return trimmed
+  }
+
+  const normalizeUserSummary = (user) => {
+    if (!user || typeof user !== 'object') return user
+    return {
+      ...user,
+      profileMediaUrl: normalizeAssetUrl(user.profileMediaUrl),
+    }
+  }
+
   const normalizeMessage = (message) => ({
     ...(message || {}),
+    mediaUrl: normalizeAssetUrl(message?.mediaUrl),
+    sender: normalizeUserSummary(message?.sender),
     reactions: normalizeReactions(message?.reactions),
   })
 
@@ -334,7 +355,8 @@ function App({ portalRole = 'user' }) {
       serviceWorkerRegRef.current.update().catch(() => null)
       return serviceWorkerRegRef.current
     }
-    const reg = await navigator.serviceWorker.register('/sw.js?v=20260320-1')
+    const existingReg = await navigator.serviceWorker.getRegistration()
+    const reg = existingReg || (await navigator.serviceWorker.register('/sw.js'))
     reg.update().catch(() => null)
     serviceWorkerRegRef.current = reg
     return reg
@@ -436,13 +458,7 @@ function App({ portalRole = 'user' }) {
   }
 
   const normalizeUploadUrl = (value) => {
-    if (typeof value !== 'string') return ''
-    const trimmed = value.trim()
-    if (!trimmed) return ''
-    if (/^https?:\/\//i.test(trimmed)) return trimmed
-    if (trimmed.startsWith('/')) return `${UPLOAD_SERVER_URL}${trimmed}`
-    if (trimmed.startsWith('public/')) return `${UPLOAD_SERVER_URL}/${trimmed}`
-    return ''
+    return normalizeAssetUrl(value)
   }
 
   const pickUploadedUrl = (payload = {}) => {
@@ -496,7 +512,7 @@ function App({ portalRole = 'user' }) {
     }
     if (currentQuery) params.set('q', currentQuery)
     const data = await apiFetch(`/api/users?${params.toString()}`, {}, authToken)
-    const incoming = data.users || []
+    const incoming = (data.users || []).map(normalizeUserSummary)
     setBlockedUserIds((prev) => {
       const next = append ? { ...prev } : {}
       incoming.forEach((user) => {
@@ -742,7 +758,7 @@ function App({ portalRole = 'user' }) {
       try {
         const me = await apiFetch('/api/auth/me', {}, token)
         if (!mounted) return
-        setCurrentUser(me.user)
+        setCurrentUser(normalizeUserSummary(me.user))
         ensurePushSubscription(token).catch(() => null)
         const fetchedUsers = await fetchContacts(token, { append: false, query: '' })
         if (!mounted) return
@@ -783,7 +799,7 @@ function App({ portalRole = 'user' }) {
                     uniqueUsername: String(message?.sender?.uniqueUsername || ''),
                     role: String(message?.sender?.role || 'user'),
                     canHandleExternalChat: Boolean(message?.sender?.canHandleExternalChat),
-                    profileMediaUrl: message?.sender?.profileMediaUrl || null,
+                    profileMediaUrl: normalizeAssetUrl(message?.sender?.profileMediaUrl) || null,
                     lastSeen: null,
                     lastMessageAt: message.createdAt || new Date().toISOString(),
                     unreadCount: shouldIncreaseUnread ? 1 : 0,
@@ -852,7 +868,8 @@ function App({ portalRole = 'user' }) {
           if (!enabled) return
           try {
             const meData = await apiFetch('/api/auth/me', {}, token)
-            setCurrentUser((prev) => (prev ? { ...prev, ...(meData.user || {}) } : meData.user || prev))
+            const normalizedMe = normalizeUserSummary(meData.user)
+            setCurrentUser((prev) => (prev ? { ...prev, ...(normalizedMe || {}) } : normalizedMe || prev))
           } catch {
             // ignore realtime refresh errors
           }
@@ -876,10 +893,11 @@ function App({ portalRole = 'user' }) {
           setUsers((prev) => {
             if (!matchesSidebarQuery(user)) return prev
             const existing = prev.find((item) => Number(item.id) === Number(user.id))
+            const normalizedUser = normalizeUserSummary(user)
             const nextUser = {
-              ...user,
-              isBlockedByMe: Boolean(user?.isBlockedByMe ?? existing?.isBlockedByMe),
-              hasBlockedMe: Boolean(user?.hasBlockedMe ?? existing?.hasBlockedMe),
+              ...(normalizedUser || user),
+              isBlockedByMe: Boolean(normalizedUser?.isBlockedByMe ?? existing?.isBlockedByMe),
+              hasBlockedMe: Boolean(normalizedUser?.hasBlockedMe ?? existing?.hasBlockedMe),
             }
             return trimSidebarUsers(mergeUniqueById(prev, [nextUser]))
           })
@@ -1490,8 +1508,9 @@ function App({ portalRole = 'user' }) {
       method: 'PATCH',
       body: JSON.stringify({ profileNote: String(profileNote || '') }),
     })
-    setCurrentUser((prev) => ({ ...prev, ...(data.user || {}), profileNote: data?.user?.profileNote || '' }))
-    return data.user || null
+    const normalizedUser = normalizeUserSummary(data.user)
+    setCurrentUser((prev) => ({ ...prev, ...(normalizedUser || {}), profileNote: normalizedUser?.profileNote || '' }))
+    return normalizedUser || null
   }
 
   const toggleBlockUser = async (chatUser) => {
@@ -1517,8 +1536,9 @@ function App({ portalRole = 'user' }) {
   const refreshCurrentUser = async (authToken = token) => {
     if (!authToken) return null
     const data = await apiFetch('/api/auth/me', {}, authToken)
-    setCurrentUser(data.user || null)
-    return data.user || null
+    const normalizedUser = normalizeUserSummary(data.user)
+    setCurrentUser(normalizedUser || null)
+    return normalizedUser || null
   }
 
   const requestLogout = () => setConfirmAction({ type: 'logout' })
