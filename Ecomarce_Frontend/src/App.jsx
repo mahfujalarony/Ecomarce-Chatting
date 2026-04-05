@@ -9,7 +9,8 @@ import SubAdminModuleGuard from "./components/SubAdminModuleGuard.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import SubAdminGate from "./components/SubAdminGate.jsx";
 import { SUBADMIN_PERMS } from "./pages/SubAdmin/permissions.js";
-import { API_BASE_URL, UPLOAD_BASE_URL } from "./config/env";
+import { API_BASE_URL } from "./config/env";
+import { resolveSiteLogoSrc } from "./utils/siteLogo";
 
 /* ─── Lazy imports ─── */
 const NotFound = lazy(() => import("./components/ui/NotFound.jsx"));
@@ -63,17 +64,8 @@ const MyGiftCards = lazy(() => import("./components/common/MyGiftCards.jsx"));
 const SubAdminDashboardLayout = lazy(() => import("./pages/SubAdmin/SubAdminDashboardLayout.jsx"));
 const SubAdminHome = lazy(() => import("./pages/SubAdmin/SubAdminHome.jsx"));
 
-const resolveAssetUrl = (value = "") => {
-  const raw = String(value || "").trim();
-  if (!raw) return "";
-  if (/^(https?:)?\/\//i.test(raw) || raw.startsWith("data:") || raw.startsWith("blob:")) {
-    return raw;
-  }
-  return `${UPLOAD_BASE_URL}/${raw.replace(/^\/+/, "")}`;
-};
-
 const setFavicon = (inputUrl = "") => {
-  const faviconUrl = resolveAssetUrl(inputUrl);
+  const faviconUrl = resolveSiteLogoSrc(inputUrl);
   if (!faviconUrl) return;
 
   let link = document.querySelector("link[rel~='icon']");
@@ -255,7 +247,7 @@ function App() {
       const siteName = String(settings?.siteName || "").trim();
       const siteLogoUrl = String(settings?.siteLogoUrl || "").trim();
       if (siteName) document.title = siteName;
-      if (siteLogoUrl) setFavicon(siteLogoUrl);
+      setFavicon(siteLogoUrl);
     };
 
     const loadAppMeta = async () => {

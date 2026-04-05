@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useSelector } from "react-redux";
-import { API_BASE_URL, UPLOAD_BASE_URL } from "../../config/env";
+import { API_BASE_URL } from "../../config/env";
+import { FALLBACK_SITE_LOGO, resolveSiteLogoSrc } from "../../utils/siteLogo";
 
 const MAX_SITE_NAME_LENGTH = 24;
 const clampSiteName = (value, fallback = "") => {
@@ -91,7 +92,7 @@ const Footer = ({ data = defaultFooterData }) => {
   const { brand, columns, social, copyright } = data;
   const isExternal = (href = "") => /^https?:\/\//i.test(String(href));
   const authState = useSelector((state) => state.auth || {});
-  const [logoSrc, setLogoSrc] = useState("");
+  const [logoSrc, setLogoSrc] = useState(FALLBACK_SITE_LOGO);
   const [siteName, setSiteName] = useState("");
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [supportContact, setSupportContact] = useState({
@@ -114,13 +115,6 @@ const Footer = ({ data = defaultFooterData }) => {
 
   useEffect(() => {
     let ignore = false;
-    const toLogoSrc = (value) => {
-      const raw = String(value || "").trim();
-      if (!raw) return "";
-      if (/^https?:\/\//i.test(raw)) return raw;
-      return `${UPLOAD_BASE_URL}/${raw.replace(/^\/+/, "")}`;
-    };
-
     (async () => {
       try {
         const res = await fetch(`${API_BASE_URL}/api/settings`);
@@ -134,7 +128,7 @@ const Footer = ({ data = defaultFooterData }) => {
         const siteLogoUrl = String(json?.data?.siteLogoUrl || "").trim();
         const dynamicSiteName = clampSiteName(json?.data?.siteName, "");
 
-        setLogoSrc(toLogoSrc(siteLogoUrl));
+        setLogoSrc(resolveSiteLogoSrc(siteLogoUrl));
         setSiteName(dynamicSiteName);
 
         setSupportContact((prev) => ({
@@ -199,7 +193,7 @@ const Footer = ({ data = defaultFooterData }) => {
         <div className="grid grid-cols-1 gap-10 lg:grid-cols-12">
           <div className="lg:col-span-4">
             <Link to={brand.href} className="inline-flex items-center gap-3">
-              {settingsLoaded && logoSrc ? (
+              {settingsLoaded ? (
                 <img src={logoSrc} className="h-10 w-10 rounded-lg object-cover border border-slate-200" alt={siteName || "Shop Logo"} />
               ) : null}
               {settingsLoaded && siteName ? (

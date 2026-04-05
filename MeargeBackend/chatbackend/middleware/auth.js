@@ -1,6 +1,6 @@
 const { User } = require('../models')
 const { ensureUserUniqueUsername } = require('../utils/user-identity')
-const { verifyAccessToken } = require('../utils/token')
+const { verifyAccessToken, assertTokenMatchesUser } = require('../utils/token')
 
 async function authMiddleware(req, res, next) {
   try {
@@ -18,6 +18,7 @@ async function authMiddleware(req, res, next) {
       return res.status(401).json({ message: 'Unauthorized: user not found' })
     }
 
+    assertTokenMatchesUser(decoded, user)
     await ensureUserUniqueUsername(user, User)
     req.user = user
     next()

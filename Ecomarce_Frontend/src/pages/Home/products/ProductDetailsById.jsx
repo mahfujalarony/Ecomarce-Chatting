@@ -12,20 +12,51 @@ import {
   InputNumber,
   message,
 } from "antd";
-import { MessageOutlined, ShopOutlined, StarFilled, CheckCircleFilled } from "@ant-design/icons";
+import { MessageOutlined, ShopOutlined, CheckCircleFilled } from "@ant-design/icons";
 import { ImageOff, Store } from "lucide-react";
 import ProductReviews from "../../../components/common/ProductReviews.jsx"; 
 import { useDispatch, useSelector } from "react-redux";
 import { addToCart, updateQty } from "./../../../redux/cartSlice.js";
 import axios from "axios";
 import { normalizeImageUrl } from "../../../utils/imageUrl";
-import { API_BASE_URL, CHAT_API_BASE_URL } from "../../../config/env";
+import {
+  API_BASE_URL,
+  CHAT_API_BASE_URL,
+  ENABLE_DEMO_REVIEWS,
+  DEMO_REVIEW_MERCHANT_IDS,
+} from "../../../config/env";
 import "./ProductDetailsById.css";
 import { canAddToCart } from "../../../utils/cartAddGuard";
 import { animateAddToCart, bumpCartBadge } from "../../../utils/cartAnimation";
+import { getDemoReviewScenario } from "../../../utils/demoReviews";
 
 const { Title, Text } = Typography;
 const API_BASE = `${API_BASE_URL}`;
+const DEMO_REVIEW_MODE_ENABLED = Boolean(ENABLE_DEMO_REVIEWS);
+const DEMO_REVIEW_MERCHANT_ID_SET = new Set(
+  (Array.isArray(DEMO_REVIEW_MERCHANT_IDS) ? DEMO_REVIEW_MERCHANT_IDS : [])
+    .map((v) => String(v).trim())
+    .filter(Boolean)
+);
+const DEMO_REVIEW_ALL_MERCHANTS =
+  DEMO_REVIEW_MERCHANT_ID_SET.has("all") ||
+  DEMO_REVIEW_MERCHANT_ID_SET.has("*");
+
+const combineReviewStats = (primary = {}, secondary = {}) => {
+  const primaryTotal = Number(primary.totalReviews || 0);
+  const secondaryTotal = Number(secondary.totalReviews || 0);
+  const totalReviews = primaryTotal + secondaryTotal;
+  if (!totalReviews) {
+    return { averageRating: 0, totalReviews: 0 };
+  }
+
+  const primarySum = Number(primary.averageRating || 0) * primaryTotal;
+  const secondarySum = Number(secondary.averageRating || 0) * secondaryTotal;
+  return {
+    averageRating: Number(((primarySum + secondarySum) / totalReviews).toFixed(1)),
+    totalReviews,
+  };
+};
 
 const ProductDetailsById = () => {
   const { id } = useParams();
@@ -251,6 +282,23 @@ const ProductDetailsById = () => {
     }
   };
 
+  const merchantId = String(product?.merchant?.id ?? product?.merchantId ?? "");
+  const useDemoReviews =
+    DEMO_REVIEW_MODE_ENABLED &&
+    merchantId &&
+    (DEMO_REVIEW_ALL_MERCHANTS || DEMO_REVIEW_MERCHANT_ID_SET.has(merchantId));
+  const demoScenario = useMemo(() => {
+    if (!useDemoReviews) {
+      return { reviews: [], averageRating: 0, totalReviews: 0 };
+    }
+    return getDemoReviewScenario({
+      merchantId,
+      productId: id,
+      productName: product?.name,
+    });
+  }, [useDemoReviews, merchantId, id, product?.name]);
+  const demoReviews = demoScenario.reviews;
+
   if (loading) {
     return (
       <div className="mx-auto w-full max-w-7xl px-3 py-3 sm:px-4 sm:py-4">
@@ -290,8 +338,30 @@ const ProductDetailsById = () => {
     );
   }
 
-  const ratingValue = Number(product.averageRating ?? product.rating ?? 0);
-  const reviewCount = Number(product.totalReviews ?? 0);
+  const realProductStats = {
+    averageRating: Number(product.averageRating ?? product.rating ?? 0),
+    totalReviews: Number(product.totalReviews ?? 0),
+  };
+  const demoProductStats = {
+    averageRating: Number(demoScenario.averageRating || 0),
+    totalReviews: Number(demoScenario.totalReviews || 0),
+  };
+  const displayProductStats = useDemoReviews
+    ? combineReviewStats(demoProductStats, realProductStats)
+    : realProductStats;
+  const realMerchantStats = {
+    averageRating: Number(product?.merchant?.rating || 0),
+    totalReviews: Number(product?.merchant?.reviews || 0),
+  };
+  const displayMerchantStats = useDemoReviews
+    ? combineReviewStats(demoProductStats, realMerchantStats)
+    : realMerchantStats;
+  const ratingValue = Number(displayProductStats.averageRating || 0);
+  const reviewCount = Number(displayProductStats.totalReviews || 0);
+  const merchantRatingValue = Number(displayMerchantStats.averageRating || 0);
+  const merchantReviewCount = Number(displayMerchantStats.totalReviews || 0);
+  const merchantReviewCountLabel =
+    merchantReviewCount >= 10000 ? "10000+" : String(merchantReviewCount);
 
   return (
     <div className="mx-auto w-full max-w-7xl px-3 py-3 sm:px-4 sm:py-4">
@@ -640,14 +710,16 @@ const ProductDetailsById = () => {
                 </h3>
                 
                 <div className="mt-1.5 flex items-center gap-3 text-xs">
-                  {Number(product.merchant.reviews || 0) > 0 ? (
+                  {merchantReviewCount > 0 ? (
                     <>
-                      <div className="flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-amber-700 border border-amber-100 font-bold">
-                        <span>{Number(product.merchant.rating || 0).toFixed(1)}</span>
-                        <StarFilled style={{ fontSize: 10 }} />
-                      </div>
-                      <span className="text-slate-500">
-                        {product.merchant.reviews} Reviews
+                      <Rate
+                        disabled
+                        allowHalf
+                        value={merchantRatingValue}
+                        style={{ fontSize: 16, color: "#f59e0b" }}
+                      />
+                      <span className="text-slate-500 text-sm leading-none">
+                        {merchantRatingValue.toFixed(1)} ({merchantReviewCountLabel})
                       </span>
                     </>
                   ) : (
@@ -704,6 +776,8 @@ const ProductDetailsById = () => {
       <ProductReviews
         productId={id}
         product={product}
+        demoMode={useDemoReviews}
+        demoReviews={demoReviews}
         onStatsUpdate={(stats) => {
           setProduct((p) => ({
             ...p,
@@ -778,4 +852,3 @@ function RelatedProductCard({ rp, onOpen, cleanImage }) {
 }
 
 export default ProductDetailsById;
-

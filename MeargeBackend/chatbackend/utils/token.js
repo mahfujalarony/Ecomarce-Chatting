@@ -28,14 +28,37 @@ function parseDurationMs(value, fallbackMs) {
   return amount * (multipliers[unit] || 1)
 }
 
-function signAccessToken(userId) {
-  return jwt.sign({ userId, type: 'access' }, ACCESS_TOKEN_SECRET, {
+function normalizeUniqueUsername(userOrUniqueUsername) {
+  const rawValue =
+    userOrUniqueUsername && typeof userOrUniqueUsername === 'object'
+      ? userOrUniqueUsername.uniqueUsername
+      : userOrUniqueUsername
+
+  return String(rawValue || '').trim()
+}
+
+function resolveTokenUserPayload(userOrUserId, maybeUniqueUsername) {
+  const isUserObject = userOrUserId && typeof userOrUserId === 'object'
+  const userId = Number(isUserObject ? userOrUserId.id : userOrUserId)
+  const uniqueUsername = normalizeUniqueUsername(isUserObject ? userOrUserId : maybeUniqueUsername)
+
+  if (!Number.isInteger(userId) || !uniqueUsername) {
+    throw new Error('Invalid token user payload')
+  }
+
+  return { userId, uniqueUsername }
+}
+
+function signAccessToken(userOrUserId, maybeUniqueUsername) {
+  const payload = resolveTokenUserPayload(userOrUserId, maybeUniqueUsername)
+  return jwt.sign({ ...payload, type: 'access' }, ACCESS_TOKEN_SECRET, {
     expiresIn: ACCESS_TOKEN_EXPIRES_IN,
   })
 }
 
-function signRefreshToken(userId) {
-  return jwt.sign({ userId, type: 'refresh' }, REFRESH_TOKEN_SECRET, {
+function signRefreshToken(userOrUserId, maybeUniqueUsername) {
+  const payload = resolveTokenUserPayload(userOrUserId, maybeUniqueUsername)
+  return jwt.sign({ ...payload, type: 'refresh' }, REFRESH_TOKEN_SECRET, {
     expiresIn: REFRESH_TOKEN_EXPIRES_IN,
   })
 }
@@ -60,6 +83,22 @@ function getRefreshTokenMaxAgeMs() {
   return parseDurationMs(REFRESH_TOKEN_EXPIRES_IN, 30 * 24 * 60 * 60 * 1000)
 }
 
+function assertTokenMatchesUser(decodedToken, user) {
+  const tokenUserId = Number(decodedToken?.userId)
+  const currentUserId = Number(user?.id)
+  const tokenUniqueUsername = normalizeUniqueUsername(decodedToken?.uniqueUsername)
+  const currentUniqueUsername = normalizeUniqueUsername(user)
+
+  if (!Number.isInteger(tokenUserId) || tokenUserId !== currentUserId) {
+    throw new Error('Token user mismatch')
+  }
+  if (!tokenUniqueUsername || !currentUniqueUsername || tokenUniqueUsername !== currentUniqueUsername) {
+    throw new Error('Token subject mismatch')
+  }
+
+  return true
+}
+
 module.exports = {
   signToken: signAccessToken,
   signAccessToken,
@@ -67,4 +106,5 @@ module.exports = {
   verifyAccessToken,
   verifyRefreshToken,
   getRefreshTokenMaxAgeMs,
+  assertTokenMatchesUser,
 }

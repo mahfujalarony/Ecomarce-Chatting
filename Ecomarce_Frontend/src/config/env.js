@@ -19,3 +19,12 @@ export const GOOGLE_CLIENT_ID = "1026628002697-u8gfo9e2puk1id2a4u0il6qre4hqtfi1.
 
 // home page er product  cash kore rakar somoy. ata 2 minit cash kore rakci jate bar bar serever req kore server er cap na barai
 export const HOME_CACHE_TTL_SECONDS = 120;
+
+// ata true mane fack review on. false takle fack review off
+export const ENABLE_DEMO_REVIEWS = true;
+
+
+// Example: ["12", "45"] 
+// ["all"] or ["*"] mane sob merchent
+// akane 2 dea rakci sudu 2 number merchent er sob product e fack review ratting dekabe
+export const DEMO_REVIEW_MERCHANT_IDS = [2];

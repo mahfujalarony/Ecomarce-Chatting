@@ -14,7 +14,8 @@ import UserDropDown from "../ui/UserDropDown";
 import NotificationSidebar from "../ui/NotificationSidebar";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useSelector } from "react-redux";
-import { API_BASE_URL, UPLOAD_BASE_URL } from "../../config/env";
+import { API_BASE_URL } from "../../config/env";
+import { FALLBACK_SITE_LOGO, resolveSiteLogoSrc } from "../../utils/siteLogo";
 
 const MAX_SITE_NAME_LENGTH = 24;
 const clampSiteName = (value, fallback = "") => {
@@ -37,7 +38,7 @@ const Navbar = ({ collapsed, setCollapsed, openDrawer, isMobile, categories = []
   const navbarRef = useRef(null);
   const { user } = useSelector((state) => state.auth);
   const totalUnreadCount = useSelector((state) => state.chat?.totalUnreadCount || 0);
-  const [logoSrc, setLogoSrc] = useState("");
+  const [logoSrc, setLogoSrc] = useState(FALLBACK_SITE_LOGO);
   const [siteName, setSiteName] = useState("");
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [searchSuggestions, setSearchSuggestions] = useState([]);
@@ -83,16 +84,9 @@ const Navbar = ({ collapsed, setCollapsed, openDrawer, isMobile, categories = []
   useEffect(() => {
     let ignore = false;
 
-    const toLogoSrc = (value) => {
-      const raw = String(value || "").trim();
-      if (!raw) return "";
-      if (/^https?:\/\//i.test(raw)) return raw;
-      return `${UPLOAD_BASE_URL}/${raw.replace(/^\/+/, "")}`;
-    };
-
     const applySettings = (settings = {}) => {
       if (ignore) return;
-      setLogoSrc(toLogoSrc(settings?.siteLogoUrl));
+      setLogoSrc(resolveSiteLogoSrc(settings?.siteLogoUrl));
       setSiteName(clampSiteName(settings?.siteName, ""));
       const rawSuggestions = settings?.searchSuggestions;
       const parsedSuggestions = Array.isArray(rawSuggestions)
@@ -111,7 +105,7 @@ const Navbar = ({ collapsed, setCollapsed, openDrawer, isMobile, categories = []
         if (!res.ok || !json?.success || ignore) return;
         applySettings(json?.data || {});
       } catch {
-        // keep empty; no default logo/name
+        // keep fallback logo and empty name
       } finally {
         if (!ignore) setSettingsLoaded(true);
       }
@@ -266,7 +260,7 @@ const Navbar = ({ collapsed, setCollapsed, openDrawer, isMobile, categories = []
           <div className="flex items-center gap-2 md:gap-3">
             {isMobile ? (
               <button
-                className="inline-flex items-center gap-1 rounded-full border border-gray-200 px-2 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                className="inline-flex min-w-[92px] items-center justify-center gap-1 rounded-full border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
                 onClick={() => {
                   setShowMobileCategories((v) => !v);
                   setMobileCategoryPath([]);
@@ -274,7 +268,7 @@ const Navbar = ({ collapsed, setCollapsed, openDrawer, isMobile, categories = []
                 disabled={catLoading}
               >
                 <AppstoreOutlined />
-                <span>Cat</span>
+                <span>Category</span>
                 <DownOutlined style={{ fontSize: 11 }} />
               </button>
             ) : (
@@ -459,7 +453,6 @@ const Navbar = ({ collapsed, setCollapsed, openDrawer, isMobile, categories = []
 
 const LeftSection = ({ setCollapsed, openDrawer, isMobile, logoSrc, siteName }) => {
   const navigate = useNavigate();
-  const initial = String(siteName || "S").slice(0, 1).toUpperCase();
   return (
     <div className="flex items-center gap-2 md:gap-6 shrink-0">
       <MenuOutlined
@@ -470,13 +463,7 @@ const LeftSection = ({ setCollapsed, openDrawer, isMobile, logoSrc, siteName }) 
         className="text-xl text-gray-700 cursor-pointer hover:text-orange-500 transition-all duration-300 hover:scale-110"
       />
       <div onClick={() => navigate("/")} className="flex items-center gap-2 cursor-pointer group shrink-0">
-        {logoSrc ? (
-          <img src={logoSrc} alt="Shop Logo" className="w-9 h-9 md:w-10 md:h-10 object-cover rounded" />
-        ) : (
-          <div className="w-9 h-9 md:w-10 md:h-10 rounded bg-sky-100 border border-sky-200 text-sky-700 font-bold flex items-center justify-center">
-            {initial}
-          </div>
-        )}
+        <img src={logoSrc} alt="Shop Logo" className="w-9 h-9 md:w-10 md:h-10 object-cover rounded" />
         {siteName ? (
           <span className="max-w-[220px] truncate text-3xl hidden md:block font-bold bg-gradient-to-r select-none from-orange-500 via-rose-500 to-amber-500 bg-clip-text text-transparent tracking-tight font-serif italic group-hover:scale-105 transition-transform duration-300">
             {siteName}
@@ -575,6 +562,37 @@ const RightSection = ({ notificationCount, user, totalUnreadCount, isMobile }) =
   const navigate = useNavigate();
 
   if (!user) {
+    if (isMobile) {
+      return (
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            className="h-9 w-9 flex items-center justify-center rounded-full border border-sky-200 bg-sky-50 text-sky-600 hover:bg-sky-100 transition-colors"
+            onClick={() => navigate("/support")}
+            aria-label="Support chat"
+            title="Support chat"
+          >
+            <MessageOutlined />
+          </button>
+          <div className="flex items-center rounded-full border border-gray-200 bg-white p-1 shadow-sm">
+            <button
+              type="button"
+              className="min-w-[58px] rounded-full px-2.5 py-1.5 text-[11px] font-semibold text-gray-700 transition-colors hover:bg-gray-100"
+              onClick={() => navigate("/login")}
+            >
+              Login
+            </button>
+            <button
+              type="button"
+              className="min-w-[62px] rounded-full bg-orange-500 px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-orange-600"
+              onClick={() => navigate("/register")}
+            >
+              Signup
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="flex items-center gap-1 sm:gap-2">
         <button

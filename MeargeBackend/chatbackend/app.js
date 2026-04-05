@@ -13,7 +13,7 @@ const moderationRoutes = require('./routes/moderation.routes')
 const { ensureUserUniqueUsername } = require('./utils/user-identity')
 const { sendPushNotification, isPushEnabled } = require('./utils/push')
 const { canAccessPairConversation, canSendToUser, isExternalUser } = require('./utils/chat-access')
-const { verifyAccessToken } = require('./utils/token')
+const { verifyAccessToken, assertTokenMatchesUser } = require('./utils/token')
 const { ensureContactPairs } = require('./utils/contact-write')
 const config = require('./config/serviceConfig')
 
@@ -171,7 +171,14 @@ async function finalizeCallSession(roomId, options = {}) {
     : 0
   const actor = options.actorUser || null
 
-  if (reason === 'disconnect') {
+  if (status === 'completed') {
+    const endedPayload = {
+      roomId,
+      byUser: actor ? { id: actor.id, username: actor.username } : null,
+    }
+    io.to(`user:${session.callerId}`).emit('call:ended', endedPayload)
+    io.to(`user:${session.calleeId}`).emit('call:ended', endedPayload)
+  } else if (reason !== 'rejected') {
     const counterpartUserId = actor?.id ? getCallCounterpartUserId(session, actor.id) : null
     if (Number.isInteger(counterpartUserId)) {
       io.to(`user:${counterpartUserId}`).emit('call:canceled', {
@@ -180,13 +187,6 @@ async function finalizeCallSession(roomId, options = {}) {
         byUser: actor ? { id: actor.id, username: actor.username } : null,
       })
     }
-  } else if (status === 'completed') {
-    const endedPayload = {
-      roomId,
-      byUser: actor ? { id: actor.id, username: actor.username } : null,
-    }
-    io.to(`user:${session.callerId}`).emit('call:ended', endedPayload)
-    io.to(`user:${session.calleeId}`).emit('call:ended', endedPayload)
   }
 
   const payloadMsg = await createCallHistoryMessage({
@@ -349,6 +349,7 @@ io.use(async (socket, next) => {
       return next(new Error('Unauthorized: user not found'))
     }
 
+    assertTokenMatchesUser(decoded, user)
     await ensureUserUniqueUsername(user, User)
     socket.user = user
     return next()

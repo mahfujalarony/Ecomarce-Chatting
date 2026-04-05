@@ -5,7 +5,8 @@ import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import Navbar from "../../components/common/Navbar";
 import CartButton from "../../components/layout/CartButton";
 import { Gift } from "lucide-react";
-import { API_BASE_URL, UPLOAD_BASE_URL } from "../../config/env";
+import { API_BASE_URL } from "../../config/env";
+import { FALLBACK_SITE_LOGO, resolveSiteLogoSrc } from "../../utils/siteLogo";
 
 const { Sider, Content } = Layout;
 const { useBreakpoint } = Grid;
@@ -55,7 +56,7 @@ const HomeLayout = () => {
 
   const [categories, setCategories] = useState([]);
   const [catLoading, setCatLoading] = useState(false);
-  const [siteMeta, setSiteMeta] = useState({ name: "", logo: "", loaded: false });
+  const [siteMeta, setSiteMeta] = useState({ name: "", logo: FALLBACK_SITE_LOGO, loaded: false });
 
   const menuItems = [
     {
@@ -74,13 +75,6 @@ const HomeLayout = () => {
       label: "Gift Cards",
     },
   ];
-
-  const resolveLogoSrc = (value = "") => {
-    const raw = String(value || "").trim();
-    if (!raw) return "";
-    if (/^https?:\/\//i.test(raw)) return raw;
-    return `${UPLOAD_BASE_URL}/${raw.replace(/^\/+/, "")}`;
-  };
 
   useEffect(() => {
     let ignore = false;
@@ -128,7 +122,7 @@ const HomeLayout = () => {
     let ignore = false;
     const applySiteMeta = (settings = {}) => {
       const name = String(settings?.siteName || "").trim();
-      const logo = resolveLogoSrc(settings?.siteLogoUrl);
+      const logo = resolveSiteLogoSrc(settings?.siteLogoUrl);
       if (!ignore) setSiteMeta({ name, logo, loaded: true });
     };
 
@@ -176,13 +170,7 @@ const HomeLayout = () => {
           isCollapsed ? "flex justify-center" : "flex items-center gap-2.5"
         }`}
       >
-        {siteMeta.logo ? (
-          <img src={siteMeta.logo} alt={siteMeta.name || "Shop"} className="h-10 w-10 rounded-xl object-cover border border-white/70" />
-        ) : (
-          <div className="h-10 w-10 rounded-xl bg-white/80 border border-white/70 flex items-center justify-center text-sky-600 font-bold">
-            {(siteMeta.name || "S").slice(0, 1).toUpperCase()}
-          </div>
-        )}
+        <img src={siteMeta.logo} alt={siteMeta.name || "Shop"} className="h-10 w-10 rounded-xl object-cover border border-white/70" />
         {!isCollapsed ? (
           <div className="min-w-0">
             <p className="text-[11px] uppercase tracking-[0.14em] text-sky-600 font-semibold">Welcome</p>

@@ -206,8 +206,8 @@ function ChatSidebar({
               type="button"
               onClick={openAddContactScreen}
               className="rounded-full p-2 text-[#54656f] transition hover:bg-[#e6eaed]"
-              title="New chat"
-              aria-label="New chat"
+              title="Add friend"
+              aria-label="Add friend"
             >
               <Users size={19} />
             </button>
@@ -255,14 +255,14 @@ function ChatSidebar({
                   <MessageCirclePlus size={16} />
                 </span>
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-[#1f2c34]">Start your first chat</p>
-                  <p className="mt-0.5 text-xs text-[#667781]">Add a contact and send a message.</p>
+                  <p className="text-sm font-semibold text-[#1f2c34]">Add your first friend</p>
+                  <p className="mt-0.5 text-xs text-[#667781]">Find a friend and start chatting.</p>
                   <button
                     type="button"
                     onClick={openAddContactScreen}
                     className="mt-2 rounded-md bg-[#25d366] px-2.5 py-1 text-[11px] font-semibold text-white transition hover:bg-[#1fab53]"
                   >
-                    New chat
+                    Add friend
                   </button>
                 </div>
               </div>

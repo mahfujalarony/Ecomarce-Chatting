@@ -6,7 +6,7 @@ import { GoogleLogin, GoogleOAuthProvider } from "@react-oauth/google";
 import { CustomerServiceOutlined, ArrowRightOutlined } from "@ant-design/icons";
 import { setAuthState } from "../../redux/authSlice.js";
 import { API_BASE_URL, GOOGLE_CLIENT_ID } from "../../config/env.js";
-import { UPLOAD_BASE_URL } from "../../config/env.js";
+import { resolveSiteLogoSrc } from "../../utils/siteLogo.js";
 
 const Login = () => {
   const dispatch = useDispatch();
@@ -27,21 +27,14 @@ const Login = () => {
   useEffect(() => {
     let ignore = false;
 
-    const resolveLogoSrc = (value = "") => {
-      const raw = String(value || "").trim();
-      if (!raw) return "";
-      if (/^https?:\/\//i.test(raw)) return raw;
-      return `${UPLOAD_BASE_URL}/${raw.replace(/^\/+/, "")}`;
-    };
-
     (async () => {
       try {
         const res = await fetch(`${API_BASE_URL}/api/settings`);
         const json = await res.json().catch(() => ({}));
         if (!res.ok || !json?.success || ignore) return;
-        setSiteLogo(resolveLogoSrc(json?.data?.siteLogoUrl));
+        setSiteLogo(resolveSiteLogoSrc(json?.data?.siteLogoUrl));
       } catch {
-        // no-op: keep empty logo
+        setSiteLogo(resolveSiteLogoSrc(""));
       }
     })();
 

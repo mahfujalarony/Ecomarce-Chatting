@@ -48,8 +48,15 @@ const timeAgo = (dateStr) => {
   return d.toLocaleDateString();
 };
 
-export default function ProductReviews({ productId, product, onStatsUpdate }) {
+export default function ProductReviews({
+  productId,
+  product,
+  onStatsUpdate,
+  demoMode = false,
+  demoReviews = [],
+}) {
   const token = useSelector((s) => s.auth?.token);
+  const DEMO_LIVE_FETCH_LIMIT = 1000;
 
   // list state
   const [reviews, setReviews] = useState([]);
@@ -87,28 +94,64 @@ export default function ProductReviews({ productId, product, onStatsUpdate }) {
     return { sort: "desc" };
   }, [sortKey]);
 
+  const allDemoReviews = useMemo(
+    () => (Array.isArray(demoReviews) ? demoReviews : []),
+    [demoReviews]
+  );
+
+  const mergedDemoReviews = useMemo(() => {
+    if (!demoMode) return [];
+
+    const seenIds = new Set();
+    return [...reviews, ...allDemoReviews].filter((item, index) => {
+      const key = String(item?.id || `demo-${index}`);
+      if (seenIds.has(key)) return false;
+      seenIds.add(key);
+      return true;
+    });
+  }, [demoMode, reviews, allDemoReviews]);
+
   const fetchReviews = async ({ reset = false } = {}) => {
     try {
       setLoading(true);
 
       const nextPage = reset ? 1 : page;
+      const params = demoMode
+        ? {
+            page: 1,
+            limit: DEMO_LIVE_FETCH_LIMIT,
+            sort: sortQuery.sort,
+            ...(sortQuery.orderBy ? { orderBy: sortQuery.orderBy } : {}),
+          }
+        : {
+            page: nextPage,
+            limit,
+            sort: sortQuery.sort,
+            ...(sortQuery.orderBy ? { orderBy: sortQuery.orderBy } : {}),
+          };
 
       const res = await axios.get(`${API_BASE}/api/reviews/product/${productId}`, {
-        params: { page: nextPage, limit, sort: sortQuery.sort },
+        params,
       });
 
       if (res.data?.success) {
         const incoming = res.data.reviews || [];
         const totalCount = Number(res.data.total || 0);
 
-        setTotal(totalCount);
-
-        if (reset) {
+        if (demoMode) {
           setReviews(incoming);
-          setPage(2);
+          setTotal(totalCount + allDemoReviews.length);
+          if (reset) setPage(1);
         } else {
-          setReviews((prev) => [...prev, ...incoming]);
-          setPage((p) => p + 1);
+          setTotal(totalCount);
+
+          if (reset) {
+            setReviews(incoming);
+            setPage(2);
+          } else {
+            setReviews((prev) => [...prev, ...incoming]);
+            setPage((p) => p + 1);
+          }
         }
       }
     } catch (e) {
@@ -138,14 +181,42 @@ export default function ProductReviews({ productId, product, onStatsUpdate }) {
     fetchReviews({ reset: true });
     fetchEligibility();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productId, sortKey, limit, token]);
+  }, [productId, sortKey, limit, token, demoMode, allDemoReviews]);
 
   const displayReviews = useMemo(() => {
-    if (sortKey !== "top") return reviews;
-    return [...reviews].sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0));
-  }, [reviews, sortKey]);
+    const source = demoMode ? mergedDemoReviews : reviews;
+    const sorted = [...source].sort((a, b) => {
+      if (sortKey === "top") return Number(b.rating || 0) - Number(a.rating || 0);
+      const at = new Date(a.createdAt || 0).getTime();
+      const bt = new Date(b.createdAt || 0).getTime();
+      return sortKey === "oldest" ? at - bt : bt - at;
+    });
+
+    if (!demoMode) return sorted;
+
+    return sorted.slice(0, page * limit);
+  }, [demoMode, mergedDemoReviews, reviews, sortKey, page, limit]);
 
   const hasMore = displayReviews.length < total;
+  const demoStats = useMemo(() => {
+    const count = allDemoReviews.length;
+    if (!count) return { totalReviews: 0, averageRating: 0 };
+    const sum = allDemoReviews.reduce((acc, r) => acc + Number(r.rating || 0), 0);
+    return {
+      totalReviews: count,
+      averageRating: Number((sum / count).toFixed(1)),
+    };
+  }, [allDemoReviews]);
+  const liveStats = useMemo(() => {
+    const liveTotal = demoMode
+      ? Number(product?.totalReviews || 0)
+      : Number(product?.totalReviews || total || 0);
+    const liveAverage = Number(product?.averageRating || product?.rating || 0);
+    return {
+      totalReviews: liveTotal,
+      averageRating: liveAverage,
+    };
+  }, [product, total]);
 
   // ✅ Upload helpers
   const beforeUpload = (file) => {
@@ -272,8 +343,18 @@ export default function ProductReviews({ productId, product, onStatsUpdate }) {
     }
   };
 
-  const avg = Number(product?.averageRating || product?.rating || 0);
-  const totalReviews = Number(product?.totalReviews || total || 0);
+  const avg = demoMode
+    ? Number(
+        (
+          ((Number(demoStats.averageRating || 0) * Number(demoStats.totalReviews || 0)) +
+            (Number(liveStats.averageRating || 0) * Number(liveStats.totalReviews || 0))) /
+          Math.max(1, Number(demoStats.totalReviews || 0) + Number(liveStats.totalReviews || 0))
+        ).toFixed(1)
+      )
+    : Number(product?.averageRating || product?.rating || 0);
+  const totalReviews = demoMode
+    ? Number(demoStats.totalReviews || 0) + Number(liveStats.totalReviews || 0)
+    : Number(product?.totalReviews || total || 0);
 
   return (
     <Card style={{ marginTop: 24 }}>
@@ -431,12 +512,30 @@ export default function ProductReviews({ productId, product, onStatsUpdate }) {
                 }}
               >
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 10, minWidth: 0, flex: "1 1 320px" }}>
-                  <Avatar
-                    src={cleanImage(r.user?.imageUrl)}
-                    icon={<User size={18} />}
-                    size={44}
-                    style={{ flex: "0 0 auto" }}
-                  />
+                  {cleanImage(r.user?.imageUrl) ? (
+                    <Avatar
+                      src={cleanImage(r.user?.imageUrl)}
+                      size={44}
+                      style={{ flex: "0 0 auto" }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: "9999px",
+                        background: "#f1f5f9",
+                        color: "#94a3b8",
+                        border: "1px solid #e2e8f0",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flex: "0 0 auto",
+                      }}
+                    >
+                      <User size={18} />
+                    </div>
+                  )}
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <Space size="small" wrap>
                       <Text strong>{r.user?.name || "User"}</Text>
@@ -485,7 +584,16 @@ export default function ProductReviews({ productId, product, onStatsUpdate }) {
 
           {hasMore && (
             <div style={{ display: "flex", justifyContent: "center", marginTop: 8 }}>
-              <Button onClick={() => fetchReviews({ reset: false })} loading={loading}>
+              <Button
+                onClick={() => {
+                  if (demoMode) {
+                    setPage((p) => p + 1);
+                    return;
+                  }
+                  fetchReviews({ reset: false });
+                }}
+                loading={loading}
+              >
                 Show more
               </Button>
             </div>

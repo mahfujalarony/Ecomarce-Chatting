@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Spin, Alert, message, Avatar, Rate, Typography, Empty, Input, Select } from "antd";
+import { Spin, Alert, message, Avatar, Rate, Typography, Empty, Input, Select, Button } from "antd";
 import { UserOutlined, ShopOutlined, EnvironmentOutlined, CalendarOutlined, CheckCircleFilled, SearchOutlined } from "@ant-design/icons";
 import { useInfiniteQuery, keepPreviousData } from "@tanstack/react-query";
 import { useInView } from "react-intersection-observer";
@@ -9,11 +9,21 @@ import { useDispatch } from "react-redux";
 import { addToCart } from "../../redux/cartSlice";
 import { canAddToCart } from "../../utils/cartAddGuard";
 import { normalizeImageUrl } from "../../utils/imageUrl";
-import { API_BASE_URL } from "../../config/env";
+import { API_BASE_URL, ENABLE_DEMO_REVIEWS, DEMO_REVIEW_MERCHANT_IDS } from "../../config/env";
+import { getDemoReviewScenario } from "../../utils/demoReviews";
 
 const { Title, Text, Paragraph } = Typography;
 const PAGE_SIZE = 24;
 const API_BASE = API_BASE_URL;
+const DEMO_REVIEW_MODE_ENABLED = import.meta.env.DEV && Boolean(ENABLE_DEMO_REVIEWS);
+const DEMO_REVIEW_MERCHANT_ID_SET = new Set(
+  (Array.isArray(DEMO_REVIEW_MERCHANT_IDS) ? DEMO_REVIEW_MERCHANT_IDS : [])
+    .map((v) => String(v).trim())
+    .filter(Boolean)
+);
+const DEMO_REVIEW_ALL_MERCHANTS =
+  DEMO_REVIEW_MERCHANT_ID_SET.has("all") ||
+  DEMO_REVIEW_MERCHANT_ID_SET.has("*");
 
 const Saller = () => {
   const { merchantId } = useParams();
@@ -176,6 +186,23 @@ const Saller = () => {
     return fresh.length > 0 ? fresh : stableProductsRef.current;
   }, [data]);
 
+  const useDemoMerchantReviews =
+    DEMO_REVIEW_MODE_ENABLED &&
+    merchantId &&
+    (DEMO_REVIEW_ALL_MERCHANTS || DEMO_REVIEW_MERCHANT_ID_SET.has(String(merchantId)));
+
+  const merchantDemoScenario = useMemo(() => {
+    if (!useDemoMerchantReviews) {
+      return { reviews: [], averageRating: 0, totalReviews: 0 };
+    }
+
+    return getDemoReviewScenario({
+      merchantId,
+      productId: "merchant-profile",
+      productName: stableMerchantRef.current?.name || "Store",
+    });
+  }, [useDemoMerchantReviews, merchantId]);
+
   const processProduct = (p) => {
     let imgs = p.images;
     if (typeof imgs === "string") {
@@ -222,8 +249,15 @@ const Saller = () => {
     month: "long",
     day: "numeric",
   });
-  const avgRating = Number(profile.averageRating || 0);
-  const totalReviews = Number(profile.totalReviews || 0);
+  const avgRating = useDemoMerchantReviews
+    ? Number(merchantDemoScenario.averageRating || 0)
+    : Number(profile.averageRating || 0);
+  const totalReviews = useDemoMerchantReviews
+    ? Number(merchantDemoScenario.totalReviews || 0)
+    : Number(profile.totalReviews || 0);
+  const totalReviewsLabel = useDemoMerchantReviews
+    ? "10000+"
+    : (totalReviews >= 10000 ? "10000+" : String(totalReviews));
   const merchantName = merchant.name || "Merchant";
 
   return (
@@ -282,10 +316,18 @@ const Saller = () => {
                   </div>
 
                   <div className="flex flex-col items-center md:items-end gap-1">
-                    <div className="flex items-center gap-1.5 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-100">
-                      <span className="text-amber-500 font-bold text-lg">{avgRating.toFixed(1)}</span>
-                      <Rate disabled allowHalf value={avgRating} style={{ fontSize: 14, color: "#f59e0b" }} />
-                      <span className="text-xs text-slate-500 ml-1">({totalReviews} reviews)</span>
+                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+                      <div className="flex items-center gap-2">
+                        <Rate
+                          disabled
+                          allowHalf
+                          value={avgRating}
+                          style={{ fontSize: 18, color: "#facc15", lineHeight: 1 }}
+                        />
+                        <span className="text-xl font-medium text-slate-500 leading-none">
+                          {avgRating.toFixed(1)} ({totalReviewsLabel})
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -363,6 +405,15 @@ const Saller = () => {
                 className="flex-1"
                 size="middle"
               />
+              <Button
+                type="primary"
+                icon={<SearchOutlined />}
+                onClick={submitSearch}
+                size="middle"
+                className="sm:min-w-[96px]"
+              >
+                Enter
+              </Button>
               <Select
                 value={sortBy}
                 onChange={(v) => {

@@ -16,7 +16,8 @@ import {
   X,
   Home,
 } from "lucide-react";
-import { API_BASE_URL, UPLOAD_BASE_URL } from "../../config/env";
+import { API_BASE_URL } from "../../config/env";
+import { FALLBACK_SITE_LOGO, resolveSiteLogoSrc } from "../../utils/siteLogo";
 
 const { Header, Sider, Content } = Layout;
 const { useBreakpoint } = Grid;
@@ -40,7 +41,7 @@ const MerchantDashboardLayout = () => {
 
   const [balance, setBalance] = useState(0);
   const [balanceLoading, setBalanceLoading] = useState(true);
-  const [siteMeta, setSiteMeta] = useState({ name: "", logo: "" });
+  const [siteMeta, setSiteMeta] = useState({ name: "", logo: FALLBACK_SITE_LOGO });
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -95,23 +96,16 @@ const MerchantDashboardLayout = () => {
   useEffect(() => {
     let ignore = false;
 
-    const resolveLogoSrc = (value = "") => {
-      const raw = String(value || "").trim();
-      if (!raw) return "";
-      if (/^https?:\/\//i.test(raw)) return raw;
-      return `${UPLOAD_BASE_URL}/${raw.replace(/^\/+/, "")}`;
-    };
-
     (async () => {
       try {
         const res = await fetch(`${API_BASE}/api/settings`);
         const json = await res.json().catch(() => ({}));
         if (!res.ok || !json?.success || ignore) return;
         const name = String(json?.data?.siteName || "").trim();
-        const logo = resolveLogoSrc(json?.data?.siteLogoUrl);
+        const logo = resolveSiteLogoSrc(json?.data?.siteLogoUrl);
         setSiteMeta({ name, logo });
       } catch {
-        // no-op: keep fallback
+        setSiteMeta((prev) => ({ ...prev, logo: resolveSiteLogoSrc("") }));
       }
     })();
 
@@ -163,36 +157,18 @@ const MerchantDashboardLayout = () => {
           justifyContent: isCollapsed ? "center" : "flex-start",
         }}
       >
-        {siteMeta.logo ? (
-          <img
-            src={siteMeta.logo}
-            alt={siteMeta.name || "Shop"}
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 12,
-              objectFit: "cover",
-              border: "1px solid rgba(255,255,255,0.8)",
-              background: "#fff",
-            }}
-          />
-        ) : (
-          <div
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 12,
-              background: "rgba(255,255,255,0.8)",
-              border: "1px solid rgba(255,255,255,0.8)",
-              display: "grid",
-              placeItems: "center",
-              fontWeight: 700,
-              color: "#0369a1",
-            }}
-          >
-            {(siteMeta.name || "M").slice(0, 1).toUpperCase()}
-          </div>
-        )}
+        <img
+          src={siteMeta.logo}
+          alt={siteMeta.name || "Shop"}
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 12,
+            objectFit: "cover",
+            border: "1px solid rgba(255,255,255,0.8)",
+            background: "#fff",
+          }}
+        />
 
         {!isCollapsed ? (
           <div style={{ minWidth: 0 }}>

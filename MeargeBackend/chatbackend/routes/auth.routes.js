@@ -2,7 +2,7 @@ const express = require('express')
 const { Op } = require('sequelize')
 const authMiddleware = require('../middleware/auth')
 const { User, Message, Contact, PushSubscription, ConversationAssignment, sequelize } = require('../models')
-const { signAccessToken, signRefreshToken, verifyRefreshToken } = require('../utils/token')
+const { signAccessToken, signRefreshToken, verifyRefreshToken, assertTokenMatchesUser } = require('../utils/token')
 const { ensureUserFolder, deleteUserFolder } = require('../utils/upload-server')
 const { buildUnusedUniqueUsername, ensureUserUniqueUsername } = require('../utils/user-identity')
 const { setRefreshTokenCookie, clearRefreshTokenCookie, getRefreshTokenFromRequest } = require('../utils/cookies')
@@ -32,7 +32,7 @@ function serializeUser(user) {
 
 function buildAuthPayload(user) {
   return {
-    token: signAccessToken(user.id),
+    token: signAccessToken(user),
     user: serializeUser(user),
   }
 }
@@ -141,7 +141,7 @@ router.post('/register', async (req, res) => {
       throw dbError
     }
 
-    const refreshToken = signRefreshToken(user.id)
+    const refreshToken = signRefreshToken(user)
     const authPayload = buildAuthPayload(user)
     setRefreshTokenCookie(res, req, refreshToken)
     return res.status(201).json({
@@ -224,7 +224,7 @@ router.post('/login', async (req, res) => {
     user.lastSeen = new Date()
     await user.save()
 
-    const refreshToken = signRefreshToken(user.id)
+    const refreshToken = signRefreshToken(user)
     const authPayload = buildAuthPayload(user)
     setRefreshTokenCookie(res, req, refreshToken)
     return res.json({
@@ -250,8 +250,9 @@ router.post('/refresh', async (req, res) => {
       return res.status(401).json({ message: 'Unauthorized: user not found' })
     }
 
+    assertTokenMatchesUser(decoded, user)
     await ensureUserUniqueUsername(user, User)
-    const nextRefreshToken = signRefreshToken(user.id)
+    const nextRefreshToken = signRefreshToken(user)
     const authPayload = buildAuthPayload(user)
     setRefreshTokenCookie(res, req, nextRefreshToken)
     return res.json({

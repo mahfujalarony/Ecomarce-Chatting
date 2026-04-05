@@ -2,6 +2,18 @@ import React, { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { animateAddToCart, bumpCartBadge } from "../../utils/cartAnimation";
 import { normalizeImageUrl } from "../../utils/imageUrl";
+import { ENABLE_DEMO_REVIEWS, DEMO_REVIEW_MERCHANT_IDS } from "../../config/env";
+import { getDemoReviewScenario } from "../../utils/demoReviews";
+
+const DEMO_REVIEW_MODE_ENABLED = import.meta.env.DEV && Boolean(ENABLE_DEMO_REVIEWS);
+const DEMO_REVIEW_MERCHANT_ID_SET = new Set(
+  (Array.isArray(DEMO_REVIEW_MERCHANT_IDS) ? DEMO_REVIEW_MERCHANT_IDS : [])
+    .map((v) => String(v).trim())
+    .filter(Boolean)
+);
+const DEMO_REVIEW_ALL_MERCHANTS =
+  DEMO_REVIEW_MERCHANT_ID_SET.has("all") ||
+  DEMO_REVIEW_MERCHANT_ID_SET.has("*");
 
 const ProductCard = ({ product, onAddToCart, onProductClick, imageClassName = "h-28 md:h-32" }) => {
   const [qty, setQty] = useState(1);
@@ -15,6 +27,24 @@ const ProductCard = ({ product, onAddToCart, onProductClick, imageClassName = "h
   const oldPrice = Number(product?.oldPrice || 0);
   const hasOldPrice = Number.isFinite(oldPrice) && oldPrice > price && price > 0;
   const discountPct = hasOldPrice ? Math.round(((oldPrice - price) / oldPrice) * 100) : 0;
+  const merchantId = String(product?.merchant?.id ?? product?.merchantId ?? "");
+  const useDemoReviews =
+    DEMO_REVIEW_MODE_ENABLED &&
+    merchantId &&
+    (DEMO_REVIEW_ALL_MERCHANTS || DEMO_REVIEW_MERCHANT_ID_SET.has(merchantId));
+  const demoSummary = useDemoReviews
+    ? getDemoReviewScenario({
+      merchantId,
+      productId: product?.id,
+      productName: product?.name,
+    })
+    : null;
+  const displayRating = useDemoReviews
+    ? demoSummary?.averageRating
+    : (product.rating ?? product.averageRating ?? null);
+  const displayReviewCount = useDemoReviews
+    ? demoSummary?.totalReviews
+    : (product.totalReviews ?? null);
 
   const handleQtyChange = (e) => {
     const raw = parseInt(e.target.value, 10);
@@ -92,7 +122,8 @@ const ProductCard = ({ product, onAddToCart, onProductClick, imageClassName = "h
             <div className="flex items-center">
               <span className="text-[10px] text-yellow-500">★</span>
               <span className="text-[10px] text-gray-500 ml-0.5">
-                {product.rating ?? product.averageRating ?? "N/A"}
+                {displayRating ?? "N/A"}
+                {Number(displayReviewCount || 0) > 0 ? ` (${displayReviewCount})` : ""}
               </span>
             </div>
           </div>
