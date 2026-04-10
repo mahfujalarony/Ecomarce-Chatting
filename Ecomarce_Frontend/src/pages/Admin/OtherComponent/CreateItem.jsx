@@ -24,11 +24,15 @@ import {
 } from "@ant-design/icons";
 
 import { API_BASE_URL, UPLOAD_BASE_URL } from "../../../config/env";
+import { formatBytes, optimizeImageFiles } from "../../../utils/imageUploadOptimizer";
 
 const { Text } = Typography;
 
 const MAX_SIZE = 10 * 1024 * 1024;
 const MAX_IMAGES = 5;
+const PRODUCT_IMAGE_MAX_WIDTH = 1600;
+const PRODUCT_IMAGE_MAX_HEIGHT = 1600;
+const PRODUCT_IMAGE_TARGET_BYTES = 900 * 1024;
 
 const API_CATEGORIES = `${API_BASE_URL}/api/categories`;
 const UPLOAD_URL = `${UPLOAD_BASE_URL}/upload/image`;
@@ -113,6 +117,7 @@ const CreateItem = () => {
   const [images, setImages] = useState([]);
   const [dragIndex, setDragIndex] = useState(null);
   const fileInputRef = useRef(null);
+  const [optimizingImages, setOptimizingImages] = useState(false);
 
   const [errorMessage, setErrorMessage] = useState("");
   const [specRows, setSpecRows] = useState([{ key: "", value: "" }]);
@@ -200,7 +205,11 @@ const CreateItem = () => {
      Images: add + preview + remove + reorder
   ───────────────────────────────────────── */
   const imagePreviews = useMemo(
-    () => images.map((f) => ({ file: f, url: URL.createObjectURL(f) })),
+    () =>
+      images.map((item) => ({
+        ...item,
+        url: URL.createObjectURL(item.file),
+      })),
     [images]
   );
 
@@ -212,7 +221,7 @@ const CreateItem = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [images]);
 
-  const addFiles = (fileList) => {
+  const addFiles = async (fileList) => {
     const files = Array.from(fileList || []);
     if (!files.length) return;
 
@@ -221,8 +230,41 @@ const CreateItem = () => {
 
     const valid = onlyImages.filter((f) => f.size <= MAX_SIZE);
     if (valid.length !== onlyImages.length) message.error("Each image must be 10MB or less");
+    if (!valid.length) return;
 
-    setImages((prev) => [...prev, ...valid].slice(0, MAX_IMAGES));
+    const existingCount = images.length;
+    const remainingSlots = Math.max(0, MAX_IMAGES - existingCount);
+    if (!remainingSlots) {
+      message.error(`You can upload up to ${MAX_IMAGES} images only.`);
+      return;
+    }
+
+    const nextBatch = valid.slice(0, remainingSlots);
+    if (valid.length > remainingSlots) {
+      message.warning(`Only first ${remainingSlots} images were added.`);
+    }
+
+    setOptimizingImages(true);
+    try {
+      const optimizedFiles = await optimizeImageFiles(nextBatch, {
+        maxWidth: PRODUCT_IMAGE_MAX_WIDTH,
+        maxHeight: PRODUCT_IMAGE_MAX_HEIGHT,
+        maxBytes: PRODUCT_IMAGE_TARGET_BYTES,
+      });
+
+      const prepared = optimizedFiles.map((optimizedFile, idx) => ({
+        file: optimizedFile,
+        originalName: nextBatch[idx]?.name || optimizedFile.name,
+        originalSize: Number(nextBatch[idx]?.size || optimizedFile.size),
+        optimizedSize: Number(optimizedFile.size || 0),
+      }));
+
+      setImages((prev) => [...prev, ...prepared].slice(0, MAX_IMAGES));
+    } catch (err) {
+      message.error(err?.message || "Image optimization failed");
+    } finally {
+      setOptimizingImages(false);
+    }
   };
 
   const handleImageChange = (e) => {
@@ -397,9 +439,9 @@ const CreateItem = () => {
         "uncategorized";
 
       const uploadJson = await Promise.all(
-        images.map(async (file, idx) => {
+        images.map(async (imageItem, idx) => {
           const fd = new FormData();
-          fd.append("file", file);
+          fd.append("file", imageItem.file);
           const uploadRes = await fetch(
             buildProductUploadUrl({
               subCategory: uploadSubCategory,
@@ -613,15 +655,24 @@ const CreateItem = () => {
                     Upload product images
                   </Text>
                   <Text type="secondary" style={{ fontSize: 12 }}>
-                    Click the cloud icon or drag & drop images here (max {MAX_IMAGES}, 10MB each).
+                    Click the cloud icon or drag & drop images here (max {MAX_IMAGES}, 10MB each). 
                   </Text>
                 </div>
               </div>
 
-              <Button onClick={() => fileInputRef.current?.click()}>Select Files</Button>
+              <Button onClick={() => fileInputRef.current?.click()} loading={optimizingImages}>
+                Select Files
+              </Button>
             </div>
 
             {/* Thumbnails + Drag reorder */}
+            {optimizingImages && (
+              <div style={{ marginTop: 10 }}>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  Optimizing images for web delivery...
+                </Text>
+              </div>
+            )}
             {images.length > 0 && (
               <div style={{ marginTop: 12 }}>
                 <Text type="secondary" style={{ fontSize: 12 }}>
@@ -680,6 +731,14 @@ const CreateItem = () => {
                       </div>
 
                       <div style={{ padding: 8 }}>
+                        <div style={{ marginBottom: 8, fontSize: 11, color: "#64748b", lineHeight: 1.35 }}>
+                          <div title={p.originalName} style={{ fontWeight: 600, color: "#334155", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {p.originalName}
+                          </div>
+                          <div>
+                            {formatBytes(p.originalSize)} to {formatBytes(p.optimizedSize)}
+                          </div>
+                        </div>
                         <Button
                           danger
                           icon={<DeleteOutlined />}
@@ -819,7 +878,7 @@ const CreateItem = () => {
             <div style={{ color: "red", textAlign: "center", marginBottom: 12 }}>{errorMessage}</div>
           )}
 
-          <Button type="primary" htmlType="submit" loading={isSubmitting} block size="large">
+          <Button type="primary" htmlType="submit" loading={isSubmitting || optimizingImages} block size="large">
             Create Product
           </Button>
         </Form>

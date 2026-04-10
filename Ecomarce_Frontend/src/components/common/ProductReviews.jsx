@@ -25,6 +25,7 @@ import { useSelector } from "react-redux";
 import { normalizeImageUrl } from "../../utils/imageUrl";
 import { API_BASE_URL } from "../../config/env";
 import { UPLOAD_BASE_URL } from "../../config/env";
+import { formatBytes, optimizeImageFiles } from "../../utils/imageUploadOptimizer";
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -84,6 +85,7 @@ export default function ProductReviews({
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState("");
   const [previewTitle, setPreviewTitle] = useState("");
+  const [imageStats, setImageStats] = useState([]);
 
   const MAX_REVIEW_IMAGES = 4;
   const MAX_SIZE_MB = 5;
@@ -236,6 +238,60 @@ export default function ProductReviews({
     return false;
   };
 
+  const handleFileListChange = async ({ fileList: nextFileList }) => {
+    const limited = nextFileList.slice(0, MAX_REVIEW_IMAGES);
+    const pendingFiles = limited
+      .filter((file) => file.originFileObj && !file.optimizedOriginFileObj)
+      .map((file) => file.originFileObj);
+
+    if (!pendingFiles.length) {
+      setFileList(limited);
+      return;
+    }
+
+    try {
+      const optimizedFiles = await optimizeImageFiles(pendingFiles, {
+        maxWidth: 1600,
+        maxHeight: 1600,
+        quality: 0.8,
+        minQuality: 0.6,
+        maxBytes: 700 * 1024,
+      });
+
+      const optimizedMap = new Map(
+        optimizedFiles.map((item) => [item.originalFile, item])
+      );
+
+      const mappedList = limited.map((file) => {
+        const optimized = optimizedMap.get(file.originFileObj);
+        if (!optimized) return file;
+
+        return {
+          ...file,
+          size: optimized.file.size,
+          originFileObj: optimized.file,
+          optimizedOriginFileObj: optimized.file,
+          originalSize: optimized.originalFile.size,
+          optimizedSize: optimized.file.size,
+        };
+      });
+
+      setFileList(mappedList);
+      setImageStats(
+        mappedList
+          .filter((file) => file.originalSize && file.optimizedSize)
+          .map((file) => ({
+            uid: file.uid,
+            originalSize: file.originalSize,
+            optimizedSize: file.optimizedSize,
+          }))
+      );
+    } catch (error) {
+      message.error("Review image optimize failed");
+      setFileList(limited);
+    }
+  };
+
   const handlePreview = async (file) => {
     // file.thumbUrl might exist; otherwise create base64
     const src = file.url || file.thumbUrl;
@@ -323,6 +379,7 @@ export default function ProductReviews({
         setMyComment("");
         setMyRating(5);
         setFileList([]); // ✅ clear selected images
+        setImageStats([]);
 
         // refresh list
         setReviews([]);
@@ -453,7 +510,7 @@ export default function ProductReviews({
                   multiple
                   beforeUpload={beforeUpload}
                   fileList={fileList}
-                  onChange={({ fileList: fl }) => setFileList(fl.slice(0, MAX_REVIEW_IMAGES))}
+                  onChange={handleFileListChange}
                   onPreview={handlePreview}
                   accept="image/*"
                 >
@@ -478,6 +535,17 @@ export default function ProductReviews({
               <Text type="secondary" style={{ fontSize: 12 }}>
                 Max {MAX_REVIEW_IMAGES} images, {MAX_SIZE_MB}MB each.
               </Text>
+              {imageStats.length > 0 ? (
+                <div style={{ marginTop: 6 }}>
+                  {imageStats.map((stat) => (
+                    <div key={stat.uid}>
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        Optimized: {formatBytes(stat.originalSize)} {"->"} {formatBytes(stat.optimizedSize)}
+                      </Text>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
 
             <Button type="primary" loading={submitting} onClick={submitReview}>

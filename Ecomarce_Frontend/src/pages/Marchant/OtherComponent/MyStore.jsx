@@ -7,6 +7,7 @@ import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
 import  { API_BASE_URL } from "../../../config/env";
 import { normalizeImageUrl } from "../../../utils/imageUrl";
+import { getMerchantDueFromNegativeStock } from "../../../utils/merchantDue";
 
 const API_BASE = `${API_BASE_URL}`;
 
@@ -117,6 +118,7 @@ export default function MyStore() {
   const [editingItem, setEditingItem] = useState(null);
   const [form] = Form.useForm();
   const [updating, setUpdating] = useState(false);
+  const [settlingId, setSettlingId] = useState(null);
 
   const query = useMemo(() => {
     const p = new URLSearchParams();
@@ -282,6 +284,51 @@ export default function MyStore() {
     }
   };
 
+  const handleSettleNegative = (item, e) => {
+    e?.stopPropagation?.();
+    const shortage = getMerchantDueFromNegativeStock(item?.stock, item?.price);
+    if (shortage.shortageQty <= 0) {
+      message.info("এই প্রোডাক্টে unpaid negative stock নেই");
+      return;
+    }
+
+    Modal.confirm({
+      title: "Pay unpaid & fill stock?",
+      content: (
+        <div>
+          <div>Current stock: <b>{Number(item?.stock || 0)}</b></div>
+          <div>Need to fill: <b>{shortage.shortageQty}</b> pcs</div>
+          <div>Unpaid (50%): <b>${moneyUSD(shortage.dueAmount)}</b></div>
+        </div>
+      ),
+      okText: "Pay & Fill",
+      onOk: async () => {
+        setSettlingId(item.id);
+        try {
+          const r = await fetch(`${API_BASE}/api/merchant/store/${item.id}/settle-negative`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          const j = await r.json();
+          if (!r.ok) throw new Error(j?.message || "Settlement failed");
+
+          message.success(
+            `${j?.message || "Settled"} | Qty: ${Number(j?.data?.settledQty || 0)} | Charged: $${moneyUSD(
+              j?.data?.chargedAmount || 0
+            )}`
+          );
+          await loadMyStore();
+        } catch (err) {
+          message.error(err?.message || "Settlement failed");
+        } finally {
+          setSettlingId(null);
+        }
+      },
+    });
+  };
+
   return (
     <div className="mx-auto w-full max-w-6xl px-3 py-2 sm:px-4 sm:py-3">
       {/* Top bar */}
@@ -335,6 +382,7 @@ export default function MyStore() {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {rows.map((p) => {
             const img = firstImage(p.images);
+            const shortage = getMerchantDueFromNegativeStock(p.stock, p.price);
 
             return (
               <div
@@ -392,10 +440,29 @@ export default function MyStore() {
                     <div className="text-sm font-semibold text-gray-900 whitespace-nowrap">
                       ${moneyUSD(p.price)}
                     </div>
-                    <div className="text-xs font-medium text-gray-700 whitespace-nowrap">
+                    <div className={`text-xs font-medium whitespace-nowrap ${Number(p.stock || 0) < 0 ? "text-red-600" : "text-gray-700"}`}>
                       Stock: {p.stock ?? 0}
                     </div>
                   </div>
+
+                  {shortage.shortageQty > 0 ? (
+                    <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-2 py-1.5 text-[11px] text-red-700">
+                      <div>
+                        Due from admin extra fulfill: {shortage.shortageQty} pcs, unpaid 50% = ${moneyUSD(shortage.dueAmount)}
+                      </div>
+                      <div className="mt-1.5">
+                        <Button
+                          size="small"
+                          type="primary"
+                          danger
+                          loading={settlingId === p.id}
+                          onClick={(e) => handleSettleNegative(p, e)}
+                        >
+                          Pay & Fill Now
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
 
                   <div className="mt-2 text-[11px] text-gray-400 truncate">
                     ProductId: {p.productId ?? "-"} â€¢ ID: {p.id}

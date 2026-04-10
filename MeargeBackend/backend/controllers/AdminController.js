@@ -3,7 +3,7 @@ const User = require("../models/Authentication");
 const Product = require("../models/Product");
 const OrderItem = require("../models/Order");
 const Offer = require("../models/Offer");
-const BalanceTopupRequest = require("../models/BalanceTopupRequest");
+const SubAdminPermission = require("../models/SubAdminPermission");
 const sequelize = require('../config/db');
 const Notification = require("../models/Notification");
 const { Op, fn, col, where: W, literal } = require("sequelize");
@@ -109,6 +109,7 @@ exports.approveMerchant = async (req, res) => {
   const t = await sequelize.transaction();
   try {
     const { id } = req.params;
+    const actorId = req.user?.id || req.userId || null;
 
     const merchant = await Merchant.findByPk(id, {
       transaction: t,
@@ -142,11 +143,12 @@ exports.approveMerchant = async (req, res) => {
     }
 
     await appendAdminHistory(
-      `Merchant request approved. User #${merchant.userId}, request #${merchant.id}.`,
+      `Merchant request approved. User #${merchant.userId}, request #${merchant.id}, by admin #${actorId || "unknown"}.`,
       {
         transaction: t,
         meta: {
           type: "merchant_request_approved",
+          actorId,
           userId: merchant.userId,
           merchantProfileId: merchant.id,
           status: "approved",
@@ -178,6 +180,7 @@ exports.rejectMerchant = async (req, res) => {
   const t = await sequelize.transaction();
   try {
     const { id } = req.params;
+    const actorId = req.user?.id || req.userId || null;
 
     const merchant = await Merchant.findByPk(id, {
       transaction: t,
@@ -207,11 +210,12 @@ exports.rejectMerchant = async (req, res) => {
     );
 
     await appendAdminHistory(
-      `Merchant request rejected. User #${merchant.userId}, request #${merchant.id}.`,
+      `Merchant request rejected. User #${merchant.userId}, request #${merchant.id}, by admin #${actorId || "unknown"}.`,
       {
         transaction: t,
         meta: {
           type: "merchant_request_rejected",
+          actorId,
           userId: merchant.userId,
           merchantProfileId: merchant.id,
           status: "rejected",
@@ -499,11 +503,7 @@ exports.getAdminStats = async (req, res) => {
       () => Merchant.count({ where: { status: "pending" } }),
       0
     );
-    const pendingTopups = await safe(
-      "topups_pending_count",
-      () => BalanceTopupRequest.count({ where: { status: "pending" } }),
-      0
-    );
+    const pendingTopups = 0;
     const activeOffers = await safe(
       "offers_active_count",
       () => Offer.count({ where: { isActive: true } }),
@@ -553,17 +553,7 @@ exports.getAdminStats = async (req, res) => {
         }),
       []
     );
-    const todayTopupApprovedRaw = await safe(
-      "topups_today_approved_sum",
-      () =>
-        BalanceTopupRequest.sum("amount", {
-          where: {
-            status: "approved",
-            createdAt: { [Op.gte]: todayStart, [Op.lt]: tomorrowStart },
-          },
-        }),
-      0
-    );
+    const todayTopupApprovedRaw = 0;
 
     let revenue = 0;
     if (includeRevenue) {
@@ -811,8 +801,6 @@ const VALID = new Set([
   "manage_merchant",
   "manage_users",
   "manage_support_chat",
-  "manage_balance_topup",
-  "manage_wallet",
 ]);
 
 exports.setSubAdminPermissions = async (req, res) => {

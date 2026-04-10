@@ -22,6 +22,7 @@ const UserDropDown = () => {
   const cartState = useSelector((state) => state.cart);
 
   const [open, setOpen] = useState(false);
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -37,6 +38,12 @@ const UserDropDown = () => {
     return items.reduce((sum, it) => sum + Number(it?.qty ?? 0), 0);
   }, [cartState]);
   const balance = Number(user?.balance || 0);
+  const userImageSrc = normalizeImageUrl(user?.imageUrl);
+  const shouldShowUserImage = Boolean(userImageSrc) && !avatarLoadFailed;
+
+  useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [userImageSrc]);
 
   const go = (path) => {
     setOpen(false);
@@ -85,10 +92,12 @@ const UserDropDown = () => {
     <div className="w-[min(92vw,22rem)] sm:w-80 rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden max-h-[min(78vh,34rem)] flex flex-col">
       <div className="px-4 py-4 border-b bg-gradient-to-r from-slate-50 to-blue-50">
         <div className="flex items-center gap-3">
-              {user?.imageUrl ? (
+              {shouldShowUserImage ? (
                 <img
-                  src={normalizeImageUrl(user.imageUrl)}
+                  src={userImageSrc}
                   alt={user?.name || "User"}
+                  referrerPolicy="no-referrer"
+                  onError={() => setAvatarLoadFailed(true)}
                   className="w-11 h-11 rounded-full object-cover border border-white shadow"
                 />
               ) : (
@@ -143,11 +152,19 @@ const UserDropDown = () => {
         className="flex items-center gap-2 rounded-full px-1.5 sm:px-2.5 py-1.5 hover:bg-slate-100 active:bg-slate-200 transition
                    focus:outline-none focus:ring-2 focus:ring-slate-200"
       >
-        <img
-          src={normalizeImageUrl(user?.imageUrl) || fallbackuserImage}
-          alt={user?.name || "User"}
-          className="w-9 h-9 rounded-full object-cover border border-slate-200"
-        />
+        {shouldShowUserImage ? (
+          <img
+            src={userImageSrc}
+            alt={user?.name || "User"}
+            referrerPolicy="no-referrer"
+            onError={() => setAvatarLoadFailed(true)}
+            className="w-9 h-9 rounded-full object-cover border border-slate-200"
+          />
+        ) : (
+          <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center border border-slate-200">
+            <User className="w-5 h-5 text-gray-400" />
+          </div>
+        )}
         <span className="hidden md:block text-sm font-medium text-slate-700 max-w-[120px] lg:max-w-[140px] truncate">
           {user?.name?.split(" ")[0] || "User"}
         </span>

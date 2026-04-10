@@ -11,8 +11,6 @@ const Offer = require("../models/Offer");
 const Category = require("../models/Category");
 const SubCategory = require("../models/SubCategory");
 const Review = require("../models/Review");
-const Wallet = require("../models/Wallet");
-const MobileBanking = require("../models/MobileBanking");
 const Notification = require("../models/Notification");
 const AppSetting = require("../models/AppSetting");
 
@@ -139,8 +137,6 @@ async function run() {
   summary.push(["Category.icon", await normalizeStringField(Category, "icon")]);
   summary.push(["SubCategory.imageUrl", await normalizeStringField(SubCategory, "imageUrl")]);
   summary.push(["Review.images", await normalizeArrayField(Review, "images")]);
-  summary.push(["Wallet.imgUrl", await normalizeStringField(Wallet, "imgUrl")]);
-  summary.push(["MobileBanking.imgUrl", await normalizeStringField(MobileBanking, "imgUrl")]);
   summary.push(["Notification.meta", await normalizeJsonField(Notification, "meta")]);
 
   const appSettings = await AppSetting.findAll({ attributes: ["key", "value"] });

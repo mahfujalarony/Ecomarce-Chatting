@@ -708,12 +708,21 @@ async function start() {
   try {
     await sequelize.authenticate()
     const dbSyncMode = config.dbSyncMode
-    if (dbSyncMode === 'alter') {
+    if (dbSyncMode === 'skip' || dbSyncMode === 'none') {
+      // Intentionally skip sync for pre-provisioned databases.
+    } else if (dbSyncMode === 'alter') {
       await sequelize.sync({ alter: true })
     } else if (dbSyncMode === 'force') {
       await sequelize.sync({ force: true })
+    } else if (dbSyncMode === 'create' || dbSyncMode === 'safe') {
+      await sequelize.sync({ force: false })
     } else {
-      await sequelize.sync()
+      const queryInterface = sequelize.getQueryInterface()
+      const tables = await queryInterface.showAllTables()
+      const tableCount = Array.isArray(tables) ? tables.length : 0
+      if (tableCount === 0) {
+        await sequelize.sync({ force: false })
+      }
     }
     const queryInterface = sequelize.getQueryInterface()
     const messagesTable = await queryInterface.describeTable('messages').catch(() => null)

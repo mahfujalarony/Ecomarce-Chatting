@@ -306,7 +306,7 @@ exports.getStoryFeed = async (req, res) => {
           include: [{ model: User, as: "user", attributes: ["id", "name", "imageUrl"] }],
         },
       ],
-      order: [["createdAt", "DESC"]],
+      order: sequelize.random(),
       limit,
     });
 

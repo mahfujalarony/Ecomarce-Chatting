@@ -13,16 +13,13 @@ const cartSlice = createSlice({
       const { id, name, price, imageUrl, merchantId, merchant, qty = 1, stock } = action.payload;
       const numericPrice = Number(price);
       const numericQty = Number(qty);
-      const maxStock = Number(stock);
-      const hasStock = Number.isFinite(maxStock) && maxStock > 0;
 
       if (!Number.isFinite(numericPrice) || numericPrice < 0) return;
       
       const existing = state.items.find((it) => it.id === id);
       if (existing) {
-        const nextQty = existing.qty + numericQty;
-        existing.qty = hasStock ? Math.min(nextQty, maxStock) : nextQty;
-        if (hasStock) existing.stock = maxStock;
+        existing.qty = existing.qty + numericQty;
+        if (stock !== undefined) existing.stock = Number(stock);
       } else {
         state.items.push({ 
           id, 
@@ -30,8 +27,8 @@ const cartSlice = createSlice({
           price: numericPrice,
           imageUrl, 
           merchantId: merchantId,
-          qty: hasStock ? Math.min(numericQty, maxStock) : numericQty,
-          ...(hasStock ? { stock: maxStock } : {}),
+          qty: numericQty,
+          ...(stock !== undefined ? { stock: Number(stock) } : {}),
         });
       }
     },
@@ -39,10 +36,7 @@ const cartSlice = createSlice({
       const { id, qty } = action.payload;
       const existing = state.items.find((it) => it.id === id);
       if (existing && qty > 0) {
-        const nextQty = Number(qty);
-        const maxStock = Number(existing.stock);
-        const hasStock = Number.isFinite(maxStock) && maxStock > 0;
-        existing.qty = hasStock ? Math.min(nextQty, maxStock) : nextQty;
+        existing.qty = Number(qty);
       }
     },
     removeFromCart: (state, action) => {

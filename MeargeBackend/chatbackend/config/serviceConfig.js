@@ -12,7 +12,7 @@ const chatbackendConfig = {
   dbPassword: serviceEnv.database?.password || "",
   dbHost: serviceEnv.database?.host || "127.0.0.1",
   dbPort: Number(serviceEnv.database?.port || 3306),
-  dbSyncMode: String(serviceEnv.database?.syncMode || "safe").toLowerCase(),
+  dbSyncMode: String(serviceEnv.database?.syncMode || "auto").toLowerCase(),
   corsOrigin: Array.isArray(webConfig.frontendOrigins)
     ? webConfig.frontendOrigins.join(",")
     : String(webConfig.frontendOrigins || "*"),

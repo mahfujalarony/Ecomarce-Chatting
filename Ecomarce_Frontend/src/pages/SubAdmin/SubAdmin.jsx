@@ -10,8 +10,6 @@ import CategoryManagement from "./../Admin/OtherComponent/CategoryManagement.jsx
 import AdminOffers from "./../Admin/OtherComponent/AdminOffers.jsx";
 import CreateItem from "./../Admin/OtherComponent/CreateItem.jsx";
 import MarchentJoinRequest from "./../Admin/OtherComponent/MarchentJoinRequest.jsx";
-import Wallet from "./../Admin/OtherComponent/Wallet.jsx";
-import BalanceTopup from "./../Admin/OtherComponent/BalanceTopup.jsx";
 import { API_BASE_URL } from "../../config/env";
 
 const API_BASE = `${API_BASE_URL}/api`;
@@ -23,8 +21,6 @@ export const PERMS = {
   manageOffer: "manage_offer",
   manageCatagory: "manage_catagory",
   manageMerchant: "manage_merchant",
-  manageBalanceTopup: "manage_balance_topup",
-  manageWallet: "manage_wallet",
   manageSupportChat: "manage_support_chat",
 };
 
@@ -49,8 +45,6 @@ export default function SubAdminPanel() {
       { key: "manageOffer", label: "Manage Offer", perm: PERMS.manageOffer, element: <AdminOffers /> },
       { key: "manageCatagory", label: "Manage Catagory", perm: PERMS.manageCatagory, element: <CategoryManagement /> },
       { key: "manageMerchant", label: "Manage Merchant", perm: PERMS.manageMerchant, element: <MarchentJoinRequest /> },
-      { key: "manageWallet", label: "Wallet", perm: PERMS.manageWallet, element: <Wallet /> },
-      { key: "manageBalanceTopup", label: "Balance Topup", perm: PERMS.manageBalanceTopup, element: <BalanceTopup /> },
       { key: "manageSupportChat", label: "Chats", perm: PERMS.manageSupportChat, element: null },
     ],
     []

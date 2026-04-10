@@ -231,8 +231,8 @@ const Navbar = ({ collapsed, setCollapsed, openDrawer, isMobile, categories = []
         }
       `}</style>
       <div className="h-1 w-full bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 animate-gradient-x" />
-      <div className="max-w-7xl mx-auto px-3 md:px-4 py-3">
-        <div className="flex items-center justify-between gap-4">
+      <div className="max-w-7xl mx-auto px-2.5 md:px-4 py-2.5 md:py-3">
+        <div className="flex items-center justify-between gap-2 md:gap-4">
           <LeftSection
             collapsed={collapsed}
             setCollapsed={setCollapsed}
@@ -257,10 +257,10 @@ const Navbar = ({ collapsed, setCollapsed, openDrawer, isMobile, categories = []
           />
 
           {/* Right side + mobile search icon */}
-          <div className="flex items-center gap-2 md:gap-3">
+          <div className="flex items-center gap-1.5 md:gap-3 shrink-0">
             {isMobile ? (
               <button
-                className="inline-flex min-w-[92px] items-center justify-center gap-1 rounded-full border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                className="inline-flex h-9 items-center justify-center gap-1 rounded-full border border-gray-200 px-2 text-[11px] font-semibold text-gray-700 hover:bg-gray-50 shrink-0"
                 onClick={() => {
                   setShowMobileCategories((v) => !v);
                   setMobileCategoryPath([]);
@@ -268,7 +268,7 @@ const Navbar = ({ collapsed, setCollapsed, openDrawer, isMobile, categories = []
                 disabled={catLoading}
               >
                 <AppstoreOutlined />
-                <span>Category</span>
+                <span className="max-[380px]:hidden">Category</span>
                 <DownOutlined style={{ fontSize: 11 }} />
               </button>
             ) : (
@@ -299,7 +299,7 @@ const Navbar = ({ collapsed, setCollapsed, openDrawer, isMobile, categories = []
             )}
             {/* Mobile search toggle */}
             <button
-              className="md:hidden w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-700"
+              className="md:hidden h-9 w-9 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-700 shrink-0"
               onClick={() => setShowMobileSearch((prev) => !prev)}
               aria-label="Search"
             >
@@ -454,16 +454,16 @@ const Navbar = ({ collapsed, setCollapsed, openDrawer, isMobile, categories = []
 const LeftSection = ({ setCollapsed, openDrawer, isMobile, logoSrc, siteName }) => {
   const navigate = useNavigate();
   return (
-    <div className="flex items-center gap-2 md:gap-6 shrink-0">
+    <div className="flex items-center gap-1.5 md:gap-6 shrink-0">
       <MenuOutlined
         onClick={() => {
           if (isMobile) openDrawer();
           else setCollapsed((prev) => !prev);
         }}
-        className="text-xl text-gray-700 cursor-pointer hover:text-orange-500 transition-all duration-300 hover:scale-110"
+        className="text-lg md:text-xl text-gray-700 cursor-pointer hover:text-orange-500 transition-all duration-300 hover:scale-110 shrink-0"
       />
       <div onClick={() => navigate("/")} className="flex items-center gap-2 cursor-pointer group shrink-0">
-        <img src={logoSrc} alt="Shop Logo" className="w-9 h-9 md:w-10 md:h-10 object-cover rounded" />
+        <img src={logoSrc} alt="Shop Logo" className="w-8 h-8 md:w-10 md:h-10 object-cover rounded" />
         {siteName ? (
           <span className="max-w-[220px] truncate text-3xl hidden md:block font-bold bg-gradient-to-r select-none from-orange-500 via-rose-500 to-amber-500 bg-clip-text text-transparent tracking-tight font-serif italic group-hover:scale-105 transition-transform duration-300">
             {siteName}
@@ -564,26 +564,26 @@ const RightSection = ({ notificationCount, user, totalUnreadCount, isMobile }) =
   if (!user) {
     if (isMobile) {
       return (
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-1 shrink-0">
           <button
-            className="h-9 w-9 flex items-center justify-center rounded-full border border-sky-200 bg-sky-50 text-sky-600 hover:bg-sky-100 transition-colors"
+            className="h-8 w-8 flex items-center justify-center rounded-full border border-sky-200 bg-sky-50 text-sky-600 hover:bg-sky-100 transition-colors"
             onClick={() => navigate("/support")}
             aria-label="Support chat"
             title="Support chat"
           >
             <MessageOutlined />
           </button>
-          <div className="flex items-center rounded-full border border-gray-200 bg-white p-1 shadow-sm">
+          <div className="flex items-center rounded-full border border-gray-200 bg-white p-0.5 shadow-sm">
             <button
               type="button"
-              className="min-w-[58px] rounded-full px-2.5 py-1.5 text-[11px] font-semibold text-gray-700 transition-colors hover:bg-gray-100"
+              className="rounded-full px-2 py-1.5 text-[11px] font-semibold text-gray-700 transition-colors hover:bg-gray-100"
               onClick={() => navigate("/login")}
             >
               Login
             </button>
             <button
               type="button"
-              className="min-w-[62px] rounded-full bg-orange-500 px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-orange-600"
+              className="rounded-full bg-orange-500 px-2 py-1.5 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-orange-600"
               onClick={() => navigate("/register")}
             >
               Signup
@@ -624,7 +624,7 @@ const RightSection = ({ notificationCount, user, totalUnreadCount, isMobile }) =
   }
 
   return (
-    <div className="flex items-center gap-3 sm:gap-5">
+    <div className="flex items-center gap-1.5 sm:gap-5 shrink-0">
       <div
         onClick={() => navigate("/chats")}
         className="cursor-pointer relative hover:scale-110 transition-transform duration-200"

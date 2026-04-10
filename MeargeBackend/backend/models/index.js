@@ -9,10 +9,6 @@ const Review = require("./Review");
 const Story = require("./Story");
 const Category = require("./Category");
 const SubCategory = require("./SubCategory");
-const MobileBanking = require("./MobileBanking");
-const Wallet = require("./Wallet");
-const WalletNumber = require("./WalletNumber");
-const BalanceTopupRequest = require("./BalanceTopupRequest");
 const GiftCard = require("./GiftCard");
 const AppSetting = require("./AppSetting");
 const Notification = require("./Notification");
@@ -75,48 +71,6 @@ SubCategory.belongsTo(SubCategory, {
   as: "parent",
 });
 
-// MobileBanking <-> Wallet
-MobileBanking.hasMany(Wallet, {
-  as: "wallets",
-  foreignKey: "mobileBankingId",
-  onDelete: "CASCADE",
-  onUpdate: "CASCADE",
-});
-Wallet.belongsTo(MobileBanking, {
-  as: "provider",
-  foreignKey: "mobileBankingId",
-});
-
-// Wallet <-> WalletNumber
-Wallet.hasMany(WalletNumber, {
-  as: "numbers",
-  foreignKey: "walletId",
-  onDelete: "CASCADE",
-  onUpdate: "CASCADE",
-});
-WalletNumber.belongsTo(Wallet, {
-  as: "wallet",
-  foreignKey: "walletId",
-});
-
-// User <-> Wallet (private owner)
-User.hasMany(Wallet, {
-  as: "myWallets",
-  foreignKey: "ownerUserId",
-  onDelete: "SET NULL",
-  onUpdate: "CASCADE",
-});
-Wallet.belongsTo(User, {
-  as: "owner",
-  foreignKey: "ownerUserId",
-});
-
-// Topup relations
-BalanceTopupRequest.belongsTo(User, { as: "user", foreignKey: "userId" });
-BalanceTopupRequest.belongsTo(MobileBanking, { as: "provider", foreignKey: "mobileBankingId" });
-BalanceTopupRequest.belongsTo(Wallet, { as: "wallet", foreignKey: "walletId" });
-BalanceTopupRequest.belongsTo(WalletNumber, { as: "walletNumber", foreignKey: "walletNumberId" });
-
 // GiftCard relations
 GiftCard.belongsTo(User, { foreignKey: "createdBy", as: "creator" });
 GiftCard.belongsTo(User, { foreignKey: "claimedBy", as: "claimer" });
@@ -137,10 +91,6 @@ module.exports = {
   Story,
   Category,
   SubCategory,
-  MobileBanking,
-  Wallet,
-  WalletNumber,
-  BalanceTopupRequest,
   GiftCard,
   AppSetting,
   Notification,

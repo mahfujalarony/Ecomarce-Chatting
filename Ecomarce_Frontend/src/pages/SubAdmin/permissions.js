@@ -5,8 +5,6 @@ export const SUBADMIN_PERMS = {
   manageOffer: "manage_offer",
   manageCatagory: "manage_catagory",
   manageMerchant: "manage_merchant",
-  manageBalanceTopup: "manage_balance_topup",
-  manageWallet: "manage_wallet",
   manageSupportChat: "manage_support_chat",
 };
 

@@ -92,8 +92,44 @@ exports.getAdminOrders = async (req, res) => {
       order: [[safeSort, safeOrder]],
     });
 
+    const productIds = [...new Set(result.rows.map((row) => Number(row.productId)).filter(Boolean))];
+    const merchantIds = [...new Set(result.rows.map((row) => Number(row.matchMerchantId)).filter(Boolean))];
+    let productMetaMap = new Map();
+
+    if (productIds.length && merchantIds.length) {
+      const productRows = await MerchentStore.findAll({
+        where: {
+          merchantId: merchantIds,
+          productId: productIds,
+        },
+        attributes: ["merchantId", "productId", "category", "subCategory", "stock", "soldCount", "price"],
+        raw: true,
+      });
+
+      productMetaMap = new Map(
+        productRows.map((row) => [`${row.merchantId}:${row.productId}`, row])
+      );
+    }
+
+    const rows = result.rows.map((row) => {
+      const json = row.toJSON();
+      const productMeta = productMetaMap.get(`${row.matchMerchantId}:${row.productId}`) || null;
+      return {
+        ...json,
+        productMeta: productMeta
+          ? {
+              category: productMeta.category,
+              subCategory: productMeta.subCategory,
+              stock: productMeta.stock,
+              soldCount: productMeta.soldCount,
+              price: productMeta.price,
+            }
+          : null,
+      };
+    });
+
     return res.json({
-      rows: result.rows,
+      rows,
       count: result.count,
       page: pageNum,
       limit: limitNum,
@@ -184,6 +220,8 @@ exports.updateOrderStatus = async (req, res) => {
       const itemPriceTotal = Number(orderItem.price) * Number(orderItem.quantity);
       const itemDelivery = Number(orderItem.deliveryCharge || 0);
       const refundAmount = itemPriceTotal + itemDelivery;
+      let refundApplied = false;
+      let restoredQty = 0;
 
       if (isPaid && refundAmount > 0) {
         // 1. Refund User
@@ -193,6 +231,7 @@ exports.updateOrderStatus = async (req, res) => {
           if (!nextUserBalance) throw new Error("Invalid user balance calculation");
           user.balance = nextUserBalance;
           await user.save({ transaction: t });
+          refundApplied = true;
         }
 
       }
@@ -200,10 +239,30 @@ exports.updateOrderStatus = async (req, res) => {
       // 4. Restore Stock
       const product = await MerchentStore.findByPk(orderItem.productId, { transaction: t, lock: t.LOCK.UPDATE });
       if (product) {
-        product.stock = Number(product.stock || 0) + Number(orderItem.quantity || 0);
-        product.soldCount = Math.max(0, Number(product.soldCount || 0) - Number(orderItem.quantity || 0));
+        restoredQty = Number(orderItem.quantity || 0);
+        product.stock = Number(product.stock || 0) + restoredQty;
+        product.soldCount = Math.max(0, Number(product.soldCount || 0) - restoredQty);
         await product.save({ transaction: t });
       }
+
+      await appendAdminHistory(
+        `Order #${orderItem.id} cancelled by admin #${actorId || "unknown"}. Refund ${refundApplied ? refundAmount.toFixed(2) : "0.00"}, stock restored ${restoredQty}.`,
+        {
+          transaction: t,
+          meta: {
+            type: "order_cancelled_refund",
+            actorId,
+            orderId: orderItem.id,
+            userId: orderItem.userId,
+            merchantId: orderItem.matchMerchantId,
+            productId: orderItem.productId,
+            wasPaid: isPaid,
+            refundApplied,
+            refundAmount: Number(refundAmount.toFixed(2)),
+            restoredQty,
+          },
+        }
+      );
     }
 
     if (nextStatus === "delivered") {

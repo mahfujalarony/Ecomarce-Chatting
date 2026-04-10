@@ -12,6 +12,7 @@ router.get("/admin-products/:id", protect, requireApprovedActiveMerchant, ctrl.g
 router.post("/store/pick", protect, requireApprovedActiveMerchant, ctrl.pickFromAdminToMerchantStore);
 router.get("/store", protect, requireApprovedActiveMerchant, ctrl.getMyStore);
 router.patch("/store/:id", protect, requireApprovedActiveMerchant, ctrl.updateMyStoreProduct);
+router.post("/store/:id/settle-negative", protect, requireApprovedActiveMerchant, ctrl.settleNegativeStockDue);
 router.get("/orders", protect, requireApprovedActiveMerchant, ctrl.getMerchantOrders);
 router.get("/stats/top-products", protect, requireApprovedActiveMerchant, ctrl.getTopSellingProducts);
 router.get("/stats/overview", protect, requireApprovedActiveMerchant, ctrl.getMerchantDashboardOverview);

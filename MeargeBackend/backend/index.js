@@ -44,23 +44,43 @@ function createBackendApp() {
   app.use("/api/categories", require("./routes/categoryRoutes"));
   app.use("/api/subcategories", require("./routes/subCategoryRoutes"));
   app.use("/api/stories", require("./routes/storyRoutes"));
-  app.use("/api/mobile-banking", require("./routes/mobileBankingRoutes"));
   app.use("/api/giftcards", require("./routes/GiftCardRoute"));
   app.use("/api/notifications", require("./routes/NotificationRoute"));
-  app.use("/api", require("./routes/walletRoutes"));
-  app.use("/api", require("./routes/balanceTopupRoutes"));
   app.get("/api/settings", getSettings);
   app.use("/api/admin", require("./routes/AdminOrderRoute"));
   app.use("/api/admin", require("./routes/AdminRoute"));
   app.use("/api/admin", require("./routes/AdminUserManageMent"));
-  app.use("/api/admin", require("./routes/adminTopupRoutes"));
   app.use("/api/offers", require("./routes/OfferRoutes"));
 
   return app;
 }
 
 async function syncBackendDatabase() {
-  await sequelize.sync({ force: false });
+  await sequelize.authenticate();
+
+  const mode = String(config.dbSyncMode || "auto").toLowerCase();
+  if (mode === "skip" || mode === "none") {
+    return;
+  }
+  if (mode === "force") {
+    await sequelize.sync({ force: true });
+    return;
+  }
+  if (mode === "alter") {
+    await sequelize.sync({ alter: true });
+    return;
+  }
+  if (mode === "create" || mode === "safe") {
+    await sequelize.sync({ force: false });
+    return;
+  }
+
+  const queryInterface = sequelize.getQueryInterface();
+  const tables = await queryInterface.showAllTables();
+  const tableCount = Array.isArray(tables) ? tables.length : 0;
+  if (tableCount === 0) {
+    await sequelize.sync({ force: false });
+  }
 }
 
 async function startStandaloneServer() {

@@ -9,8 +9,6 @@ import {
   Tags,
   Shapes,
   UserPlus,
-  Wallet,
-  DollarSign,
   MessageSquare,
 } from "lucide-react";
 import { Alert, Badge, Button, Drawer, Layout, Menu, theme, Grid } from "antd";
@@ -60,18 +58,6 @@ const ALL_MENU = [
     label: "Merchant Requests",
     icon: <UserPlus size={18} />,
     perm: SUBADMIN_PERMS.manageMerchant,
-  },
-  {
-    key: "/subadmin/wallets",
-    label: "Wallet",
-    icon: <Wallet size={18} />,
-    perm: SUBADMIN_PERMS.manageWallet,
-  },
-  {
-    key: "/subadmin/balance-topup",
-    label: "Balance Topup",
-    icon: <DollarSign size={18} />,
-    perm: SUBADMIN_PERMS.manageBalanceTopup,
   },
   {
     key: "/chats",

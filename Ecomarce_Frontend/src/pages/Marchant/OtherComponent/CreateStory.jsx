@@ -23,11 +23,15 @@ import { useSelector } from "react-redux";
 import { API_BASE_URL } from "../../../config/env";
 import { UPLOAD_BASE_URL } from "../../../config/env";
 import { normalizeImageUrl } from "../../../utils/imageUrl";
+import { formatBytes, optimizeImageFile } from "../../../utils/imageUploadOptimizer";
 
 const { Title, Text } = Typography;
 
 const API_BASE = `${API_BASE_URL}`;
 const UPLOAD_URL = `${UPLOAD_BASE_URL}/upload/image?scope=stories`;
+const STORY_IMAGE_MAX_WIDTH = 1080;
+const STORY_IMAGE_MAX_HEIGHT = 1920;
+const STORY_IMAGE_TARGET_BYTES = 700 * 1024;
 
 const clean = (u) => (u ? String(u).replace(/\\/g, "/") : "");
 const pickUploadedPath = (json) => {
@@ -47,6 +51,8 @@ export default function CreateStory() {
   const [title, setTitle] = useState("");
 
   const [fileList, setFileList] = useState([]);
+  const [optimizingImages, setOptimizingImages] = useState(false);
+  const [imageStats, setImageStats] = useState([]);
   const [submitting, setSubmitting] = useState(false);
 
   const [myStories, setMyStories] = useState([]);
@@ -75,6 +81,48 @@ export default function CreateStory() {
       return Upload.LIST_IGNORE;
     }
     return false; // stop auto upload
+  };
+
+  const handleFileListChange = async ({ fileList: fl }) => {
+    const latest = fl.slice(0, MAX_IMAGES);
+    const optimizedList = [];
+    const nextStats = [];
+
+    setOptimizingImages(true);
+    try {
+      for (const item of latest) {
+        const rawFile = item.originFileObj;
+        if (!rawFile) {
+          optimizedList.push(item);
+          continue;
+        }
+
+        const optimizedFile = await optimizeImageFile(rawFile, {
+          maxWidth: STORY_IMAGE_MAX_WIDTH,
+          maxHeight: STORY_IMAGE_MAX_HEIGHT,
+          maxBytes: STORY_IMAGE_TARGET_BYTES,
+        });
+
+        optimizedList.push({
+          ...item,
+          originFileObj: optimizedFile,
+          size: optimizedFile.size,
+          name: optimizedFile.name,
+        });
+        nextStats.push({
+          uid: item.uid,
+          originalSize: Number(rawFile.size || 0),
+          optimizedSize: Number(optimizedFile.size || 0),
+        });
+      }
+
+      setFileList(optimizedList);
+      setImageStats(nextStats);
+    } catch (err) {
+      message.error(err?.message || "Image optimization failed");
+    } finally {
+      setOptimizingImages(false);
+    }
   };
 
   const fetchMyStories = async () => {
@@ -210,6 +258,9 @@ export default function CreateStory() {
   }, [storyDurationHours]);
 
   const canCreateStory = !submitting && fileList.length > 0 && Number(merchantBalance || 0) >= Number(storyFee || 0);
+  const statsSummary = imageStats.length
+    ? imageStats.map((item) => `${formatBytes(item.originalSize)} to ${formatBytes(item.optimizedSize)}`).join(" • ")
+    : "";
 
   const toggleActive = async (story, checked) => {
     try {
@@ -298,9 +349,6 @@ export default function CreateStory() {
               <Text strong>Story Duration</Text>
               <div style={{ marginTop: 6 }}>
                 <Tag color="purple">{durationLabel}</Tag>
-                <Text type="secondary" style={{ marginLeft: 10 }}>
-                  Admin fixed setting (user cannot change)
-                </Text>
               </div>
             </div>
 
@@ -313,7 +361,8 @@ export default function CreateStory() {
                   accept="image/*"
                   beforeUpload={beforeUpload}
                   fileList={fileList}
-                  onChange={({ fileList: fl }) => setFileList(fl.slice(0, MAX_IMAGES))}
+                  onChange={handleFileListChange}
+                  disabled={optimizingImages}
                 >
                   {fileList.length >= MAX_IMAGES ? null : (
                     <div>
@@ -324,15 +373,29 @@ export default function CreateStory() {
                 </Upload>
               </div>
               <Text type="secondary" style={{ fontSize: 12 }}>
-                Max {MAX_IMAGES} images, {MAX_MB}MB each.
+                Max {MAX_IMAGES} images, {MAX_MB}MB each. 
               </Text>
+              {optimizingImages ? (
+                <div style={{ marginTop: 6 }}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    Optimizing story images...
+                  </Text>
+                </div>
+              ) : null}
+              {statsSummary ? (
+                <div style={{ marginTop: 6 }}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    {statsSummary}
+                  </Text>
+                </div>
+              ) : null}
             </div>
 
             <Button
               type="primary"
               icon={<UploadOutlined />}
               loading={submitting}
-              disabled={!canCreateStory}
+              disabled={!canCreateStory || optimizingImages}
               onClick={handleCreate}
             >
               Create Story

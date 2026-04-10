@@ -28,9 +28,6 @@ const AdminOffers = lazy(() => import("./pages/Admin/OtherComponent/AdminOffers.
 const SubAdminPermition = lazy(() => import("./pages/Admin/OtherComponent/SubAdminPermition.jsx"));
 const Settings = lazy(() => import("./pages/Admin/OtherComponent/Settings.jsx"));
 const History = lazy(() => import("./pages/Admin/OtherComponent/History.jsx"));
-const Wallet = lazy(() => import("./pages/Admin/OtherComponent/Wallet.jsx"));
-const BalanceTopup = lazy(() => import("./pages/Admin/OtherComponent/BalanceTopup.jsx"));
-const MobileBankingId = lazy(() => import("./pages/Admin/OtherComponent/MobileBankingId.jsx"));
 const UserList = lazy(() => import("./pages/Admin/OtherComponent/UserList.jsx"));
 
 const MerchantDashboardLayout = lazy(() => import("./pages/Marchant/MarchantDashboardLayout.jsx"));
@@ -338,9 +335,6 @@ function App() {
               <Route path="subadmins" element={<SubAdminPermition />} />
               <Route path="settings" element={<Settings />} />
               <Route path="history" element={<History />} />
-              <Route path="wallets" element={<Wallet />} />
-              <Route path="wallets/:mobileBankingId" element={<MobileBankingId />} />
-              <Route path="balance-topup" element={<BalanceTopup />} />
             </Route>
           </Route>
 
@@ -354,9 +348,6 @@ function App() {
               <Route path="offers" element={<SubAdminModuleGuard perm={SUBADMIN_PERMS.manageOffer}><AdminOffers /></SubAdminModuleGuard>} />
               <Route path="category-management" element={<SubAdminModuleGuard perm={SUBADMIN_PERMS.manageCatagory}><CategoryManagement /></SubAdminModuleGuard>} />
               <Route path="merchant-join-requests" element={<SubAdminModuleGuard perm={SUBADMIN_PERMS.manageMerchant}><MarchentJoinRequest /></SubAdminModuleGuard>} />
-              <Route path="wallets" element={<SubAdminModuleGuard perm={SUBADMIN_PERMS.manageWallet}><Wallet /></SubAdminModuleGuard>} />
-              <Route path="wallets/:mobileBankingId" element={<SubAdminModuleGuard perm={SUBADMIN_PERMS.manageWallet}><MobileBankingId /></SubAdminModuleGuard>} />
-              <Route path="balance-topup" element={<SubAdminModuleGuard perm={SUBADMIN_PERMS.manageBalanceTopup}><BalanceTopup /></SubAdminModuleGuard>} />
             </Route>
           </Route>
 

@@ -13,6 +13,7 @@ const backendConfig = {
   dbPassword: serviceEnv.database?.password || "",
   dbHost: serviceEnv.database?.host || "localhost",
   dbDialect: serviceEnv.database?.dialect || "mysql",
+  dbSyncMode: String(serviceEnv.database?.syncMode || "auto").toLowerCase(),
   jwtSecret: serviceEnv.jwtSecret || "secretkey",
   jwtExpiresIn: serviceEnv.jwtExpiresIn || "30d",
   adminHistoryRetentionDays: Math.max(1, Number(serviceEnv.adminHistoryRetentionDays || 15)),

@@ -11,6 +11,7 @@ const chatConfig = {
   dbPassword: serviceEnv.database?.password || "",
   dbHost: serviceEnv.database?.host || "localhost",
   dbDialect: serviceEnv.database?.dialect || "mysql",
+  dbSyncMode: String(serviceEnv.database?.syncMode || "auto").toLowerCase(),
   jwtSecret: serviceEnv.jwtSecret || "secretkey",
   frontendOrigins: Array.isArray(webConfig.frontendOrigins)
     ? webConfig.frontendOrigins.join(",")

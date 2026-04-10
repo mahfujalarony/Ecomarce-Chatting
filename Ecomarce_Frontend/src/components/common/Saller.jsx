@@ -15,7 +15,7 @@ import { getDemoReviewScenario } from "../../utils/demoReviews";
 const { Title, Text, Paragraph } = Typography;
 const PAGE_SIZE = 24;
 const API_BASE = API_BASE_URL;
-const DEMO_REVIEW_MODE_ENABLED = import.meta.env.DEV && Boolean(ENABLE_DEMO_REVIEWS);
+const DEMO_REVIEW_MODE_ENABLED = Boolean(ENABLE_DEMO_REVIEWS);
 const DEMO_REVIEW_MERCHANT_ID_SET = new Set(
   (Array.isArray(DEMO_REVIEW_MERCHANT_IDS) ? DEMO_REVIEW_MERCHANT_IDS : [])
     .map((v) => String(v).trim())

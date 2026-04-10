@@ -280,14 +280,20 @@ const MerchantPickProducts = () => {
 
   const handlePick = async (product) => {
     const pid = product.id;
-    const qty = clampQtyByStock(qtyMap[pid] || 1, product?.stock);
-    if (qtyMap[pid] !== qty) {
+    const merchantStoreStock = Number(product?.merchantStoreQty ?? 0);
+    const deficitQty = Math.max(0, Math.abs(Math.min(0, merchantStoreStock)));
+    const hasCustomQty = Object.prototype.hasOwnProperty.call(qtyMap, pid);
+    const baseQty = hasCustomQty ? qtyMap[pid] : (deficitQty > 0 ? deficitQty : 1);
+    const qty = clampQtyByStock(baseQty, product?.stock);
+    if (qty <= 0) return message.error("Stock নেই, pick করা যাবে না");
+    if (!hasCustomQty || qtyMap[pid] !== qty) {
       setQtyMap((m) => ({ ...m, [pid]: qty }));
     }
     const unitPrice = Number(product.price || 0);
     const fullCost = unitPrice * qty;
     const charge = getPickCharge(product, qty);
     const remaining = balance - charge;
+    const projectedStoreStock = merchantStoreStock + qty;
 
     if (!canStock(product, qty)) return message.error("Admin stock enough না");
     if (!canAfford(product, qty)) return message.error("Balance কম");
@@ -307,6 +313,12 @@ const MerchantPickProducts = () => {
             </div>
             <div>
               Product Total: <b>{qty} x ${Number(unitPrice || 0).toFixed(2)} = ${Number(fullCost || 0).toFixed(2)}</b>
+            </div>
+            <div>
+              Your Current Store Stock: <b>{merchantStoreStock}</b>
+            </div>
+            <div>
+              Store Stock After Pick: <b>{projectedStoreStock}</b>
             </div>
             <div>Charge (50%): <b style={{ color: "red" }}>${Number(charge || 0).toFixed(2)}</b></div>
             <div style={{ borderTop: "1px solid #eee", marginTop: 5, paddingTop: 5 }}>
@@ -506,9 +518,15 @@ const MerchantPickProducts = () => {
           >
             {products.map((p) => {
               const pid = p.id;
-              const selectedQty = Number(qtyMap[pid] || 1);
-              const inStoreQty = Number(p?.merchantStoreQty || 0);
+              const inStoreQty = Number(p?.merchantStoreQty ?? 0);
+              const deficitQty = Math.max(0, Math.abs(Math.min(0, inStoreQty)));
+              const hasCustomQty = Object.prototype.hasOwnProperty.call(qtyMap, pid);
+              const selectedQty = Number(hasCustomQty ? qtyMap[pid] : (deficitQty > 0 ? deficitQty : 1));
+              const effectiveQty = clampQtyByStock(selectedQty, p?.stock);
               const isInStore = inStoreQty > 0;
+              const numericStock = Number(p?.stock || 0);
+              const isNegativeStock = numericStock < 0;
+              const isOutOfStock = numericStock === 0;
 
               return (
                 <Card
@@ -525,6 +543,17 @@ const MerchantPickProducts = () => {
                     <div style={{ marginBottom: 6 }}>
                       <Tag color="green" style={{ marginRight: 0, fontSize: 11, fontWeight: 700 }}>
                         IN YOUR STORE: {inStoreQty}
+                      </Tag>
+                    </div>
+                  )}
+
+                  {inStoreQty < 0 && (
+                    <div style={{ marginBottom: 6, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      <Tag color="red" style={{ marginRight: 0, fontSize: 11, fontWeight: 700 }}>
+                        YOUR STOCK: {inStoreQty}
+                      </Tag>
+                      <Tag color="orange" style={{ marginRight: 0, fontSize: 11, fontWeight: 700 }}>
+                        NEED TO FILL: {deficitQty}
                       </Tag>
                     </div>
                   )}
@@ -571,8 +600,16 @@ const MerchantPickProducts = () => {
 
                   <div style={{ marginTop: 6, display: "flex", justifyContent: "space-between", fontSize: 12, color: "#444" }}>
                     <span style={{ fontWeight: 800 }}>${Number(p.price || 0).toFixed(2)}</span>
-                    <span>Stock: {p.stock ?? 0}</span>
+                    <span style={{ color: isNegativeStock ? "#dc2626" : "inherit", fontWeight: isNegativeStock ? 700 : 500 }}>
+                      Stock: {numericStock}
+                    </span>
                   </div>
+
+                  {(isNegativeStock || isOutOfStock) && (
+                    <div style={{ marginTop: 4, fontSize: 11, color: isNegativeStock ? "#dc2626" : "#b45309", fontWeight: 700 }}>
+                      {isNegativeStock ? "Negative stock detected" : "Out of stock"}
+                    </div>
+                  )}
 
                   {isInStore && (
                     <div style={{ marginTop: 4, fontSize: 11, color: "#15803d", fontWeight: 600 }}>
@@ -598,15 +635,15 @@ const MerchantPickProducts = () => {
                       type="primary"
                       block
                       loading={pickingId === pid}
-                      disabled={!canStock(p, selectedQty) || !canAfford(p, selectedQty)}
+                      disabled={effectiveQty <= 0 || !canStock(p, effectiveQty) || !canAfford(p, effectiveQty)}
                       onClick={() => handlePick(p)}
                     >
-                      Pick
+                      {deficitQty > 0 ? "Fill Deficit" : "Pick"}
                     </Button>
                   </div>
 
                   <div style={{ marginTop: 6, fontSize: 11, color: "#777" }}>
-                    Charge (50%): ${getPickCharge(p, selectedQty).toFixed(2)}
+                    Charge (50%): ${getPickCharge(p, effectiveQty).toFixed(2)}
                   </div>
                 </Card>
               );

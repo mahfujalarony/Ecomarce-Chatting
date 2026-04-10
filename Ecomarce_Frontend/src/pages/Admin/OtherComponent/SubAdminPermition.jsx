@@ -29,8 +29,6 @@ const PERMISSIONS_OPTIONS = [
   { label: "Manage Merchant Requests", value: "manage_merchant" },
   { label: "Manage Support Chats", value: "manage_support_chat" },
   { label: "Manage Users", value: "manage_users" },
-  { label: "Manage Balance Topup", value: "manage_balance_topup" },
-  { label: "Manage Wallet", value: "manage_wallet" },
 ];
 
 const SubAdminPermition = () => {

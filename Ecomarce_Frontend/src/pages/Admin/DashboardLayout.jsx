@@ -85,16 +85,7 @@ const DashboardLayout = () => {
       icon: <UserPlus size={18} />,
       label: "Merchant Join Requests",
     },
-    {
-      key: "/admin/wallets",
-      icon: <Wallet size={18} />,
-      label: "Wallet",
-    },
-    {
-      key: "/admin/balance-topup",
-      icon: <DollarSign size={18} />,
-      label: "Balance Topup",
-    },
+
     {
       key: "/admin/settings",
       icon: <Settings size={18} />,

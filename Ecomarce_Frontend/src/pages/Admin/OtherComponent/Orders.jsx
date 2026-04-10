@@ -3,6 +3,7 @@ import { Drawer, Grid, message as antdMessage } from "antd";
 import { useSelector } from "react-redux";
 import { API_BASE_URL } from "../../../config/env";
 import { normalizeImageUrl } from "../../../utils/imageUrl";
+import { getMerchantDueFromNegativeStock, toMoney } from "../../../utils/merchantDue";
 
 const BASE_URL = API_BASE_URL;
 const STATUS_FLOW = ["pending", "processing", "shipped", "delivered"];
@@ -105,6 +106,26 @@ function Spinner({ className = "h-4 w-4" }) {
 }
 
 function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
+
+function getShortageMeta(order) {
+  const shortageQty = Math.max(0, Math.abs(Math.min(0, Number(order?.productMeta?.stock || 0))));
+  const dueAmount = toMoney(
+    getMerchantDueFromNegativeStock(order?.productMeta?.stock, order?.productMeta?.price ?? order?.price).dueAmount
+  );
+  if (shortageQty <= 0 || dueAmount <= 0) return null;
+  return { shortageQty, dueAmount };
+}
+
+function ShortageChip({ order }) {
+  const meta = getShortageMeta(order);
+  if (!meta) return null;
+
+  return (
+    <div className="mt-1 text-[11px] text-amber-700">
+      Extra {meta.shortageQty} pcs · 50% unpaid $${meta.dueAmount.toFixed(2)}
+    </div>
+  );
+}
 
 // ─── Status badge chip for filter tabs ───
 function StatusTab({ value, active, count, onClick }) {
@@ -561,6 +582,7 @@ export default function Orders() {
                             {row.trackingNote ? <span className="text-gray-600"> ({row.trackingNote})</span> : null}
                           </div>
                         ) : null}
+                        <ShortageChip order={row} />
                         <div className="mt-2.5 flex gap-1.5 sm:gap-2">
                           <select value={draft || ""} onClick={(e) => e.stopPropagation()}
                             onChange={(e) => handleChangeDraft(row.id, e.target.value)}
@@ -686,6 +708,7 @@ export default function Orders() {
                                       {row.trackingNote ? <span className="text-gray-600"> ({row.trackingNote})</span> : null}
                                     </div>
                                   ) : null}
+                                  <ShortageChip order={row} />
                                 </div>
                               </div>
                             </Td>
@@ -763,6 +786,7 @@ function OrderDetailsDrawer({ open, loading, error, data, onClose }) {
   const address = data?.address || null;
   const user = data?.user || null;
   const t = order ? order.createdAt || order.updatedAt || order.created_at || order.updated_at : null;
+  const shortageMeta = getShortageMeta(order);
 
   return (
     <Drawer
@@ -792,6 +816,8 @@ function OrderDetailsDrawer({ open, loading, error, data, onClose }) {
               <Row label="Product" value={order.name} />
               <Row label="Qty" value={order.quantity} />
               <Row label="Price" value={`$${order.price}`} />
+              {shortageMeta ? <Row label="Extra Qty" value={shortageMeta.shortageQty} /> : null}
+              {shortageMeta ? <Row label="Unpaid 50%" value={`$${shortageMeta.dueAmount.toFixed(2)}`} /> : null}
               <div className="pt-1">
                 <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${statusPillClasses(order.status)}`}>
                   {statusLabel(order.status)}

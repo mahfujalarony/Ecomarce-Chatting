@@ -23,9 +23,13 @@ import { useSelector } from "react-redux";
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
 import { normalizeImageUrl } from "../../../utils/imageUrl";
+import { formatBytes, optimizeImageFile } from "../../../utils/imageUploadOptimizer";
 
 const UPLOAD_ENDPOINT = `${UPLOAD_BASE_URL}/upload/image?scope=offers`;
 const UPLOAD_DELETE_ENDPOINT = `${UPLOAD_BASE_URL}/upload/delete`;
+const OFFER_IMAGE_MAX_WIDTH = 1600;
+const OFFER_IMAGE_MAX_HEIGHT = 900;
+const OFFER_IMAGE_TARGET_BYTES = 700 * 1024;
 
 const getFullImageUrl = (imgPath) => {
   return normalizeImageUrl(imgPath) || "/placeholder-product.jpg";
@@ -61,6 +65,8 @@ const AdminOffers = () => {
   const [loading, setLoading] = useState(false);
 
   const [fileList, setFileList] = useState([]);
+  const [optimizingImage, setOptimizingImage] = useState(false);
+  const [imageStats, setImageStats] = useState(null);
 
 
   const [open, setOpen] = useState(false);
@@ -104,6 +110,7 @@ const AdminOffers = () => {
     setKeepExisting(true);
     setEditing(null);
     setFileList([]);
+    setImageStats(null);
   };
 
   // ✅ Load offers
@@ -512,21 +519,52 @@ const AdminOffers = () => {
                 beforeUpload={() => false}
                 maxCount={1}
                 listType="picture"
+                disabled={optimizingImage}
                 fileList={fileList}
-                onChange={(info) => {
+                onChange={async (info) => {
                 const latest = info.fileList.slice(-1); // only 1 file
-                setFileList(latest);
+                const rawFile = latest?.[0]?.originFileObj;
 
-                const file = latest?.[0]?.originFileObj;
-                if (file) {
-                    setLocalPreview(URL.createObjectURL(file));
-                    if (editing) setKeepExisting(false);
-                } else {
+                if (!rawFile) {
+                    setFileList([]);
                     setLocalPreview(null);
+                    setImageStats(null);
+                    return;
+                }
+
+                setOptimizingImage(true);
+                try {
+                    const optimizedFile = await optimizeImageFile(rawFile, {
+                      maxWidth: OFFER_IMAGE_MAX_WIDTH,
+                      maxHeight: OFFER_IMAGE_MAX_HEIGHT,
+                      maxBytes: OFFER_IMAGE_TARGET_BYTES,
+                    });
+
+                    const wrappedFile = {
+                      ...latest[0],
+                      originFileObj: optimizedFile,
+                      size: optimizedFile.size,
+                      name: optimizedFile.name,
+                    };
+
+                    setFileList([wrappedFile]);
+                    setLocalPreview(URL.createObjectURL(optimizedFile));
+                    setImageStats({
+                      originalSize: Number(rawFile.size || 0),
+                      optimizedSize: Number(optimizedFile.size || 0),
+                    });
+                    if (editing) setKeepExisting(false);
+                } catch (err) {
+                    message.error(err?.message || "Image optimization failed");
+                    setFileList([]);
+                    setLocalPreview(null);
+                    setImageStats(null);
+                } finally {
+                    setOptimizingImage(false);
                 }
                 }}
             >
-                <Button icon={<UploadOutlined />}>Select Image</Button>
+                <Button icon={<UploadOutlined />} loading={optimizingImage}>Select Image</Button>
             </Upload>
             </Form.Item>
 
@@ -537,6 +575,7 @@ const AdminOffers = () => {
               <img src={localPreview} alt="preview" className="w-full h-40 object-cover" />
               <div className="px-3 py-2 text-xs text-gray-500 bg-gray-50 border-t">
                 Selected image preview (will be uploaded)
+                {imageStats ? ` • ${formatBytes(imageStats.originalSize)} to ${formatBytes(imageStats.optimizedSize)}` : ""}
               </div>
             </div>
           ) : null}

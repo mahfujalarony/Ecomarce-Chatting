@@ -235,28 +235,12 @@ const Search = () => {
       return false;
     }
     const requestedQty = Math.max(1, Number(qty || 1));
-    const maxStock = Number(product?.stock);
-    const hasStock = Number.isFinite(maxStock) && maxStock > 0;
     const existingQty = Number(
       cartItems.find((it) => String(it.id) === String(product?.id))?.qty || 0
     );
 
     if (existingQty > 0) {
       message.info(`Already in cart (${existingQty}). Quantity change from cart page.`);
-      return false;
-    }
-
-    if (hasStock && existingQty >= maxStock) {
-      message.warning(`Maximum stock reached (In cart: ${existingQty}/${maxStock})`);
-      return false;
-    }
-
-    const allowedQty = hasStock
-      ? Math.min(requestedQty, Math.max(0, maxStock - existingQty))
-      : requestedQty;
-
-    if (allowedQty <= 0) {
-      message.warning("Quantity exceeds available stock");
       return false;
     }
 
@@ -272,14 +256,10 @@ const Search = () => {
         merchantId: product.merchantId,
         imageUrl: product.images?.[0],
         stock: product.stock,
-        qty: allowedQty,
+        qty: requestedQty,
       })
     );
-    if (allowedQty < requestedQty) {
-      message.success(`${allowedQty} x ${product.name} added (stock limit applied)`);
-    } else {
-      message.success(`${allowedQty} x ${product.name} added to cart`);
-    }
+    message.success(`${requestedQty} x ${product.name} added to cart`);
     return true;
   };
 

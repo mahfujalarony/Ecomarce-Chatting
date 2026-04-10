@@ -21,6 +21,8 @@ export default function MerchantProfile() {
   const [loading, setLoading] = useState(true);
   const [merchant, setMerchant] = useState(null);
   const [balance, setBalance] = useState(0);
+  const [totalUnpaid, setTotalUnpaid] = useState(0);
+  const [totalShortageQty, setTotalShortageQty] = useState(0);
   const [supportContact, setSupportContact] = useState({ email: "", whatsapp: "" });
 
   const token = useMemo(() => {
@@ -95,8 +97,12 @@ export default function MerchantProfile() {
         const balanceData = await balanceRes.json().catch(() => ({}));
         if (balanceRes.ok) {
           setBalance(Number(balanceData?.data?.balance || 0));
+          setTotalUnpaid(Number(balanceData?.data?.totalUnpaid || 0));
+          setTotalShortageQty(Number(balanceData?.data?.totalShortageQty || 0));
         } else {
           setBalance(0);
+          setTotalUnpaid(0);
+          setTotalShortageQty(0);
         }
 
         const settingsData = await settingsRes.json().catch(() => ({}));
@@ -111,6 +117,8 @@ export default function MerchantProfile() {
       } catch (e) {
         message.error(e?.message || "Failed to load merchant profile");
         setMerchant(null);
+        setTotalUnpaid(0);
+        setTotalShortageQty(0);
       } finally {
         setLoading(false);
       }
@@ -170,6 +178,12 @@ export default function MerchantProfile() {
           <Text>
             Current Balance: <Text strong>${Number(balance || 0).toFixed(2)}</Text>
           </Text>
+          {Number(totalUnpaid || 0) > 0 ? (
+            <Text type="warning">
+              Remaining Due: <Text strong>${Number(totalUnpaid || 0).toFixed(2)}</Text>
+              {` | Shortage: ${Number(totalShortageQty || 0)} pcs`}
+            </Text>
+          ) : null}
           <Text type="secondary">
             To request a withdrawal, please contact Support Chat or use the WhatsApp/Email set in admin settings.
           </Text>

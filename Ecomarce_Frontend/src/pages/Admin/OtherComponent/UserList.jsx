@@ -34,6 +34,7 @@ const { useBreakpoint } = Grid;
 
 const API_BASE = `${API_BASE_URL}/api`;
 const cleanImg = (url) => normalizeImageUrl(url);
+const money = (value) => Number(value || 0).toFixed(2);
 const isTopupBlocked = (u) => {
   const t = u?.topupBlockedUntil ? new Date(u.topupBlockedUntil).getTime() : 0;
   return Number.isFinite(t) && t > Date.now();
@@ -219,6 +220,24 @@ export default function UserList() {
       render: (v) => <Text strong>{Number(v || 0).toFixed(2)}</Text>,
     },
     {
+      title: "Total Unpaid",
+      key: "totalUnpaid",
+      render: (_, u) => (
+        <div style={{ lineHeight: 1.2 }}>
+          <Text strong style={{ color: Number(u.totalUnpaid || 0) > 0 ? "#d97706" : undefined }}>
+            {u.role === "merchant" ? money(u.totalUnpaid || 0) : "—"}
+          </Text>
+          {u.role === "merchant" ? (
+            <div>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                Shortage: {Number(u.totalShortageQty || 0)} pcs
+              </Text>
+            </div>
+          ) : null}
+        </div>
+      ),
+    },
+    {
       title: "Created",
       dataIndex: "createdAt",
       key: "createdAt",
@@ -238,11 +257,6 @@ export default function UserList() {
           <Button icon={<EditOutlined />} onClick={() => openEdit(u)}>
             Edit
           </Button>
-          {isTopupBlocked(u) ? (
-            <Button danger onClick={() => unblockTopup(u)}>
-              Unblock Topup
-            </Button>
-          ) : null}
         </Space>
       ),
     },
@@ -251,19 +265,6 @@ export default function UserList() {
   const toggleCardDetails = (id) => {
     setExpandedCards((prev) => ({ ...prev, [id]: !prev[id] }));
   };
-
-  async function unblockTopup(u) {
-    const uid = Number(u?.id);
-    if (!uid) return;
-    try {
-      await axios.patch(`${API_BASE}/admin/topups/users/${uid}/unblock`, {}, { headers });
-      message.success("Topup block removed");
-      await fetchUsers();
-    } catch (e) {
-
-      message.error(e.response?.data?.message || "Failed to unblock topup");
-    }
-  }
 
   return (
     <Card style={{ borderRadius: 16 }}>
@@ -383,8 +384,16 @@ export default function UserList() {
                   </Text>
                   <Text style={{ fontSize: 13 }}>
                     <Text type="secondary">Balance: </Text>
-                    {Number(u.balance || 0).toFixed(2)}
+                    {money(u.balance || 0)}
                   </Text>
+                  {u.role === "merchant" ? (
+                    <Text style={{ fontSize: 13 }}>
+                      <Text type="secondary">Total unpaid: </Text>
+                      <span style={{ color: Number(u.totalUnpaid || 0) > 0 ? "#d97706" : undefined }}>
+                        {money(u.totalUnpaid || 0)}
+                      </span>
+                    </Text>
+                  ) : null}
                   {isTopupBlocked(u) ? (
                     <Tag color="magenta" style={{ marginInlineEnd: 0, width: "fit-content" }}>
                       Blocked till: {new Date(u.topupBlockedUntil).toLocaleString()}
@@ -398,6 +407,12 @@ export default function UserList() {
                       <Text type="secondary">Role: </Text>
                       {String(u.role || "-")}
                     </Text>
+                    {u.role === "merchant" ? (
+                      <Text style={{ fontSize: 13 }}>
+                        <Text type="secondary">Shortage Qty: </Text>
+                        {Number(u.totalShortageQty || 0)} pcs
+                      </Text>
+                    ) : null}
                     <Text type="secondary" style={{ fontSize: 12 }}>
                       {u.createdAt ? new Date(u.createdAt).toLocaleString() : "-"}
                     </Text>

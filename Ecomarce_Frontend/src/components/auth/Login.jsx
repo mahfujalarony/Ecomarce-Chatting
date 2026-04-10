@@ -5,7 +5,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { GoogleLogin, GoogleOAuthProvider } from "@react-oauth/google";
 import { CustomerServiceOutlined, ArrowRightOutlined } from "@ant-design/icons";
 import { setAuthState } from "../../redux/authSlice.js";
-import { API_BASE_URL, GOOGLE_CLIENT_ID } from "../../config/env.js";
+import { API_BASE_URL, GOOGLE_CLIENT_ID, UPLOAD_BASE_URL } from "../../config/env.js";
 import { resolveSiteLogoSrc } from "../../utils/siteLogo.js";
 
 const Login = () => {

@@ -3,7 +3,7 @@ const trimSlash = (v = "") => String(v || "").replace(/\/+$/, "");
 
 // Backend Url
 
-const UNIFIED_BASE_URL = trimSlash("https://server.nexusglobalshop.com");
+const UNIFIED_BASE_URL = trimSlash("http://localhost:3000");
 
 export const API_BASE_URL = trimSlash(UNIFIED_BASE_URL);
 export const API_BASE_PATH = trimSlash(`${API_BASE_URL}/api`);
@@ -27,4 +27,4 @@ export const ENABLE_DEMO_REVIEWS = true;
 // Example: ["12", "45"] 
 // ["all"] or ["*"] mane sob merchent
 // akane 2 dea rakci sudu 2 number merchent er sob product e fack review ratting dekabe
-export const DEMO_REVIEW_MERCHANT_IDS = [2];
+export const DEMO_REVIEW_MERCHANT_IDS = [1];

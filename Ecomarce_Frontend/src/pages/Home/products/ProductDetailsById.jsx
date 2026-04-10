@@ -183,18 +183,16 @@ const ProductDetailsById = () => {
     setQty(v);
 
     //  only update cart qty if item already in cart
-    if (cartItem && product && v > 0 && v <= product.stock) {
+    if (cartItem && product && v > 0) {
       dispatch(updateQty({ id: product.id, qty: v }));
     }
   };
 
   const handleIncrease = () => {
     if (!product) return;
-    if (qty < product.stock) {
-      const newQty = qty + 1;
-      setQty(newQty);
-      if (cartItem) dispatch(updateQty({ id: product.id, qty: newQty }));
-    }
+    const newQty = qty + 1;
+    setQty(newQty);
+    if (cartItem) dispatch(updateQty({ id: product.id, qty: newQty }));
   };
 
   const handleDecrease = () => {
@@ -215,11 +213,6 @@ const ProductDetailsById = () => {
     if (addCooldown || !canAddToCart(product?.id)) {
       message.info("Already added. Please wait a moment.");
       return false;
-    }
-
-    if (qty > product.stock) {
-      message.error("Quantity exceeds available stock");
-      return;
     }
 
     fetch(`${API_BASE}/api/track/add-to-cart/${product.id}`, { method: "POST" }).catch(
@@ -619,7 +612,6 @@ const ProductDetailsById = () => {
                     </Button>
                     <InputNumber
                       min={1}
-                      max={product.stock}
                       value={qty}
                       onChange={handleQtyChange}
                       style={{ width: 70 }}
@@ -627,7 +619,6 @@ const ProductDetailsById = () => {
                     <Button
                       size="small"
                       onClick={handleIncrease}
-                      disabled={qty >= product.stock}
                     >
                       +
                     </Button>
@@ -656,7 +647,7 @@ const ProductDetailsById = () => {
 
                 <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                   {product.stock > 0 && (
-                    <Text type="secondary">Available: {product.stock}</Text>
+                    <Text type="secondary">Merchant stock now: {product.stock}</Text>
                   )}
                   {cartItem && <Tag color="blue">In cart: {cartItem.qty}</Tag>}
                 </div>

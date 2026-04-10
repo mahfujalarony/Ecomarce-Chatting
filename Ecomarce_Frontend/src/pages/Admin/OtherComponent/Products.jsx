@@ -31,6 +31,7 @@ import {
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
 import { normalizeImageUrl } from "../../../utils/imageUrl";
+import { optimizeImageFile } from "../../../utils/imageUploadOptimizer";
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { API_BASE_URL } from "../../../config/env";
@@ -39,6 +40,9 @@ import { UPLOAD_BASE_URL } from "../../../config/env";
 const API_CATEGORIES = `${API_BASE_URL}/api/categories`;
 const API_ADMIN_PRODUCTS = `${API_BASE_URL}/api/admin/products`;
 const UPLOAD_URL = `${UPLOAD_BASE_URL}/upload/image`;
+const PRODUCT_IMAGE_MAX_WIDTH = 1600;
+const PRODUCT_IMAGE_MAX_HEIGHT = 1600;
+const PRODUCT_IMAGE_TARGET_BYTES = 900 * 1024;
 
 const buildProductUploadUrl = ({ subCategory, productId, startCount }) => {
   const params = new URLSearchParams();
@@ -320,9 +324,21 @@ const AdminProducts = () => {
       // 1. Upload new images if present (support multiple)
       let newImagePaths = [];
       if (values.images && values.images.length > 0) {
-        const uploadPromises = values.images.map((fileItem, idx) => {
+        const optimizedFiles = await Promise.all(
+          values.images.map(async (fileItem) => {
+            const rawFile = fileItem?.originFileObj;
+            if (!rawFile) return null;
+            return optimizeImageFile(rawFile, {
+              maxWidth: PRODUCT_IMAGE_MAX_WIDTH,
+              maxHeight: PRODUCT_IMAGE_MAX_HEIGHT,
+              maxBytes: PRODUCT_IMAGE_TARGET_BYTES,
+            });
+          })
+        );
+
+        const uploadPromises = optimizedFiles.filter(Boolean).map((file, idx) => {
           const fd = new FormData();
-          fd.append("file", fileItem.originFileObj);
+          fd.append("file", file);
           const uploadEndpoint = buildProductUploadUrl({
             subCategory: values.subCategory || values.category || editingProduct?.subCategory || "uncategorized",
             productId: editingId,

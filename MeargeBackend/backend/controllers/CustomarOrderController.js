@@ -131,7 +131,7 @@ exports.createCustomerOrder = async (req, res) => {
 
     const productMap = new Map(products.map((p) => [String(p.id), p]));
 
-    // validate merchant + stock
+    // validate merchant
     for (const it of items) {
       const p = productMap.get(String(it.productId));
       if (!p) {
@@ -142,14 +142,6 @@ exports.createCustomerOrder = async (req, res) => {
       if (!p.merchantId) {
         await t.rollback();
         return res.status(400).json({ message: `Product ${p.id} missing merchant` });
-      }
-
-      const qty = Number(it.quantity);
-      if (Number(p.stock) < qty) {
-        await t.rollback();
-        return res.status(400).json({
-          message: `Not enough stock for ${p.name}. Available: ${p.stock}`,
-        });
       }
     }
 
@@ -235,9 +227,8 @@ exports.createCustomerOrder = async (req, res) => {
         await t.rollback();
         return res.status(400).json({ message: "Invalid product price" });
       }
-
       // stock & soldCount
-      p.stock = Number(p.stock) - qty;
+      p.stock = Number(p.stock || 0) - qty;
       p.soldCount = Number(p.soldCount || 0) + qty;
       await p.save({ transaction: t });
 

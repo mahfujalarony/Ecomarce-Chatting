@@ -244,8 +244,7 @@ exports.getAdminProductsForMerchant = async (req, res) => {
 
     const andConditions = [];
 
-    // ✅ Only admin products that have stock
-    andConditions.push({ stock: { [Op.gt]: 0 } });
+    // Show all admin products (including zero/negative stock) so merchants can see stock state.
 
     // ✅ category normalize compare
     const categoryScopeList = String(categoryScopes || "")
@@ -370,7 +369,34 @@ exports.getMyBalance = async (req, res) => {
     const me = await Authentication.findByPk(merchantId, { attributes: ["id", "balance"] });
     if (!me) return res.status(404).json({ message: "Merchant not found" });
 
-    return res.json({ data: { merchantId: me.id, balance: Number(me.balance || 0) } });
+    const dueRows = await MerchentStore.findAll({
+      where: {
+        merchantId,
+        stock: { [Op.lt]: 0 },
+      },
+      attributes: ["stock", "price"],
+      raw: true,
+    });
+
+    const dueSummary = dueRows.reduce(
+      (acc, row) => {
+        const shortageQty = Math.max(0, Math.abs(Math.min(0, Number(row.stock || 0))));
+        const dueAmount = Number((shortageQty * Number(row.price || 0) * 0.5).toFixed(2));
+        acc.totalShortageQty += shortageQty;
+        acc.totalUnpaid += dueAmount;
+        return acc;
+      },
+      { totalUnpaid: 0, totalShortageQty: 0 }
+    );
+
+    return res.json({
+      data: {
+        merchantId: me.id,
+        balance: Number(me.balance || 0),
+        totalUnpaid: Number((dueSummary.totalUnpaid || 0).toFixed(2)),
+        totalShortageQty: Number(dueSummary.totalShortageQty || 0),
+      },
+    });
   } catch (err) {
     return res.status(500).json({ message: "Server error" });
   }
@@ -603,6 +629,140 @@ exports.updateMyStoreProduct = async (req, res) => {
 
     return res.json({ success: true, message: "Product updated", data: product });
   } catch (err) {
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+// POST /api/merchant/store/:id/settle-negative
+// Settle negative merchant stock by paying 50% due and pulling deficit qty from admin stock.
+exports.settleNegativeStockDue = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const merchantId = req.userId || req.user?.id || getAuthUserId(req);
+    if (!merchantId) {
+      await t.rollback();
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const storeId = Number(req.params.id);
+    if (!storeId) {
+      await t.rollback();
+      return res.status(400).json({ message: "Invalid store product id" });
+    }
+
+    const storeItem = await MerchentStore.findOne({
+      where: { id: storeId, merchantId },
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    });
+    if (!storeItem) {
+      await t.rollback();
+      return res.status(404).json({ message: "Product not found in your store" });
+    }
+
+    const currentStoreStock = Number(storeItem.stock || 0);
+    const shortageQty = Math.max(0, Math.abs(Math.min(0, currentStoreStock)));
+    if (shortageQty <= 0) {
+      await t.rollback();
+      return res.status(400).json({ message: "This product has no unpaid negative stock" });
+    }
+
+    const unitPrice = Number(storeItem.price || 0);
+    if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+      await t.rollback();
+      return res.status(400).json({ message: "Invalid product price" });
+    }
+
+    const dueAmount = Number((shortageQty * unitPrice * 0.5).toFixed(2));
+
+    const merchant = await Authentication.findByPk(merchantId, {
+      attributes: ["id", "balance"],
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    });
+    if (!merchant) {
+      await t.rollback();
+      return res.status(404).json({ message: "Merchant not found" });
+    }
+
+    const currentBalance = Number(merchant.balance || 0);
+    if (currentBalance < dueAmount) {
+      await t.rollback();
+      return res.status(400).json({
+        message: "Insufficient balance to settle unpaid stock",
+        required: dueAmount,
+        balance: currentBalance,
+      });
+    }
+
+    const adminProduct = await Product.findByPk(storeItem.productId, {
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    });
+    if (!adminProduct) {
+      await t.rollback();
+      return res.status(404).json({ message: "Linked admin product not found" });
+    }
+
+    const adminStockNow = Number(adminProduct.stock || 0);
+    if (adminStockNow < shortageQty) {
+      await t.rollback();
+      return res.status(400).json({
+        message: "This product does not have enough stock right now. Please contact support for assistance.",
+        requiredQty: shortageQty,
+        adminAvailable: adminStockNow,
+      });
+    }
+
+    const nextMerchantBalance = subMoney2(currentBalance, dueAmount);
+    if (!nextMerchantBalance) {
+      await t.rollback();
+      return res.status(400).json({ message: "Invalid balance calculation" });
+    }
+
+    merchant.balance = nextMerchantBalance;
+    await merchant.save({ transaction: t });
+
+    adminProduct.stock = adminStockNow - shortageQty;
+    adminProduct.soldCount = Number(adminProduct.soldCount || 0) + shortageQty;
+    adminProduct.soldBy = upsertSoldBy(adminProduct.soldBy, merchantId, shortageQty);
+    await adminProduct.save({ transaction: t });
+
+    storeItem.stock = 0;
+    await storeItem.save({ transaction: t });
+
+    await appendAdminHistory(
+      `Merchant #${merchantId} settled unpaid negative stock for store item #${storeItem.id} (product #${storeItem.productId}). Qty ${shortageQty}, charged 50% = ${dueAmount.toFixed(2)}.`,
+      {
+        transaction: t,
+        meta: {
+          type: "merchant_negative_stock_settlement",
+          merchantId,
+          storeItemId: storeItem.id,
+          productId: storeItem.productId,
+          qty: shortageQty,
+          chargedAmount: dueAmount,
+        },
+      }
+    );
+
+    await t.commit();
+
+    return res.json({
+      success: true,
+      message: "Unpaid negative stock settled successfully",
+      data: {
+        storeItemId: storeItem.id,
+        productId: storeItem.productId,
+        settledQty: shortageQty,
+        chargedAmount: dueAmount,
+        newMerchantBalance: Number(merchant.balance || 0),
+        newStoreStock: Number(storeItem.stock || 0),
+        newAdminStock: Number(adminProduct.stock || 0),
+      },
+    });
+  } catch (err) {
+    await t.rollback();
     return res.status(500).json({ message: "Server error" });
   }
 };

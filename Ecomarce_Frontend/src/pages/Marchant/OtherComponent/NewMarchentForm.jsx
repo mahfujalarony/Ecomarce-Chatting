@@ -5,11 +5,15 @@ import { UploadOutlined } from "@ant-design/icons";
 import axios from "axios";
 import { API_BASE_URL } from "../../../config/env";
 import { UPLOAD_BASE_URL } from "../../../config/env";
+import { optimizeImageFile } from "../../../utils/imageUploadOptimizer";
 
 const { Title, Text } = Typography;
 
 const API_BASE = `${API_BASE_URL}`;
 const IMG_BASE = `${UPLOAD_BASE_URL}`;
+const MERCHANT_IMAGE_MAX_WIDTH = 1600;
+const MERCHANT_IMAGE_MAX_HEIGHT = 1600;
+const MERCHANT_IMAGE_TARGET_BYTES = 900 * 1024;
 const uploadBoxStyle = {
   border: "1px dashed #94a3b8",
   background: "#f8fafc",
@@ -86,24 +90,47 @@ const MerchantRegistration = ({ onSubmitted }) => {
 
   const validateImage = (file) => {
     if (!file.type.startsWith("image/")) return "Only images allowed";
-    if (file.size > 5 * 1024 * 1024) return "Max 5MB";
+    if (file.size > 10 * 1024 * 1024) return "Max 10MB";
     return null;
   };
 
-  const handleFrontChange = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const err = validateImage(file);
-    if (err) return message.error(err);
-    setFrontFile(file);
+  const optimizeMerchantImage = async (file) => {
+    const optimizedFile = await optimizeImageFile(file, {
+      maxWidth: MERCHANT_IMAGE_MAX_WIDTH,
+      maxHeight: MERCHANT_IMAGE_MAX_HEIGHT,
+      maxBytes: MERCHANT_IMAGE_TARGET_BYTES,
+    });
+    return optimizedFile;
   };
 
-  const handleBackChange = (e) => {
+  const handleFrontChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const err = validateImage(file);
     if (err) return message.error(err);
-    setBackFile(file);
+    try {
+      const optimizedFile = await optimizeMerchantImage(file);
+      setFrontFile(optimizedFile);
+    } catch (optimizeError) {
+      message.error(optimizeError?.message || "Front image optimization failed");
+    } finally {
+      e.target.value = "";
+    }
+  };
+
+  const handleBackChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const err = validateImage(file);
+    if (err) return message.error(err);
+    try {
+      const optimizedFile = await optimizeMerchantImage(file);
+      setBackFile(optimizedFile);
+    } catch (optimizeError) {
+      message.error(optimizeError?.message || "Back image optimization failed");
+    } finally {
+      e.target.value = "";
+    }
   };
 
   const paypalEmail = watch("paypalEmail");
@@ -338,7 +365,7 @@ const MerchantRegistration = ({ onSubmitted }) => {
                 <label htmlFor="merchant-id-front-upload" style={uploadBoxStyle}>
                   <UploadOutlined style={{ fontSize: 22, color: "#0ea5e9" }} />
                   <div style={{ fontWeight: 700, color: "#0f172a" }}>Click to upload front side</div>
-                  <div style={{ fontSize: 12, color: "#64748b" }}>JPG/PNG, max 5MB</div>
+                  <div style={{ fontSize: 12, color: "#64748b" }}>Max 10MB, image will be optimized to WebP before upload</div>
                   {frontFile && (
                     <div style={{ marginTop: 2, fontSize: 12, color: "#16a34a", fontWeight: 600 }}>
                       Selected: {frontFile.name}
@@ -358,7 +385,9 @@ const MerchantRegistration = ({ onSubmitted }) => {
                     <Button
                       danger
                       size="small"
-                      onClick={() => setFrontFile(null)}
+                      onClick={() => {
+                        setFrontFile(null);
+                      }}
                       style={{ position: "absolute", top: 8, right: 8 }}
                     >
                       Remove
@@ -377,7 +406,7 @@ const MerchantRegistration = ({ onSubmitted }) => {
                 <label htmlFor="merchant-id-back-upload" style={uploadBoxStyle}>
                   <UploadOutlined style={{ fontSize: 22, color: "#0ea5e9" }} />
                   <div style={{ fontWeight: 700, color: "#0f172a" }}>Click to upload back side</div>
-                  <div style={{ fontSize: 12, color: "#64748b" }}>JPG/PNG, max 5MB</div>
+                  <div style={{ fontSize: 12, color: "#64748b" }}>Max 10MB, image will be optimized to WebP before upload</div>
                   {backFile && (
                     <div style={{ marginTop: 2, fontSize: 12, color: "#16a34a", fontWeight: 600 }}>
                       Selected: {backFile.name}
@@ -397,7 +426,9 @@ const MerchantRegistration = ({ onSubmitted }) => {
                     <Button
                       danger
                       size="small"
-                      onClick={() => setBackFile(null)}
+                      onClick={() => {
+                        setBackFile(null);
+                      }}
                       style={{ position: "absolute", top: 8, right: 8 }}
                     >
                       Remove

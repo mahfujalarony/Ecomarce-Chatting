@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Button, Card, Input, Popconfirm, Space, Switch, Tree, Typography, message } from "antd";
 import { ReloadOutlined } from "@ant-design/icons";
 import { API_BASE_URL } from "../../../config/env";
+import { useSelector } from "react-redux";
 
 const { Text } = Typography;
 
@@ -49,6 +50,7 @@ const findNodeByKey = (nodes = [], key) => {
 };
 
 export default function CategoryWithSubAdmin() {
+  const reduxToken = useSelector((state) => state.auth?.token);
   const [categories, setCategories] = useState([]);
   const [treeLoading, setTreeLoading] = useState(false);
 
@@ -60,6 +62,22 @@ export default function CategoryWithSubAdmin() {
 
   const treeData = useMemo(() => buildTreeData(categories), [categories]);
   const selectedNode = useMemo(() => findNodeByKey(treeData, selectedKey), [treeData, selectedKey]);
+  const token = useMemo(() => {
+    if (reduxToken) return reduxToken;
+    try {
+      const saved = JSON.parse(localStorage.getItem("userInfo") || "null");
+      return saved?.token || "";
+    } catch {
+      return "";
+    }
+  }, [reduxToken]);
+  const authHeaders = useMemo(
+    () => ({
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    }),
+    [token]
+  );
 
   const loadTree = async () => {
     try {
@@ -90,7 +108,7 @@ export default function CategoryWithSubAdmin() {
       if (!selectedNode || selectedNode.nodeType === "root") {
         const res = await fetch(API_CATEGORIES, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: authHeaders,
           body: JSON.stringify({ name: name.trim(), isActive }),
         });
         const data = await res.json();
@@ -98,7 +116,7 @@ export default function CategoryWithSubAdmin() {
       } else if (selectedNode.nodeType === "category") {
         const res = await fetch(API_SUBCATS, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: authHeaders,
           body: JSON.stringify({
             categoryId: selectedNode.categoryId,
             parentSubCategoryId: null,
@@ -111,7 +129,7 @@ export default function CategoryWithSubAdmin() {
       } else {
         const res = await fetch(API_SUBCATS, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: authHeaders,
           body: JSON.stringify({
             categoryId: selectedNode.categoryId,
             parentSubCategoryId: selectedNode.subCategoryId,
@@ -141,11 +159,17 @@ export default function CategoryWithSubAdmin() {
       setDeleting(true);
 
       if (selectedNode.nodeType === "category") {
-        const res = await fetch(`${API_CATEGORIES}/${selectedNode.categoryId}`, { method: "DELETE" });
+        const res = await fetch(`${API_CATEGORIES}/${selectedNode.categoryId}`, {
+          method: "DELETE",
+          headers: authHeaders,
+        });
         const data = await res.json();
         if (!res.ok) throw new Error(data?.message || "Failed to delete category");
       } else {
-        const res = await fetch(`${API_SUBCATS}/${selectedNode.subCategoryId}`, { method: "DELETE" });
+        const res = await fetch(`${API_SUBCATS}/${selectedNode.subCategoryId}`, {
+          method: "DELETE",
+          headers: authHeaders,
+        });
         const data = await res.json();
         if (!res.ok) throw new Error(data?.message || "Failed to delete subcategory");
       }

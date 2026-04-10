@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Drawer } from "antd";
 import { API_BASE_URL } from "../../../config/env";
 import { normalizeImageUrl } from "../../../utils/imageUrl";
+import { getMerchantDueFromNegativeStock } from "../../../utils/merchantDue";
 
 const API_URL = `${API_BASE_URL}`;
 const ALL_STATUSES = ["pending", "processing", "shipped", "delivered", "cancelled"];
@@ -34,6 +35,28 @@ const renderSettlementNote = (order, compact = false) => {
       {compact
         ? `Delivered settlement: Sale $${s.gross.toFixed(2)} -> base $${s.baseReturn.toFixed(2)} + bonus $${s.bonus.toFixed(2)} (${s.rate.toFixed(2)}%) = credit $${s.merchantCredit.toFixed(2)}.`
         : `Delivered: Total sale $${s.gross.toFixed(2)}. Base return $${s.baseReturn.toFixed(2)} (50%) + bonus $${s.bonus.toFixed(2)} (${s.rate.toFixed(2)}%) = $${s.merchantCredit.toFixed(2)} added to your balance. Admin part: $${s.adminPart.toFixed(2)}.`}
+    </div>
+  );
+};
+
+const getShortageMeta = (order) => {
+  const shortageQty = Math.max(0, Math.abs(Math.min(0, Number(order?.productMeta?.stock || 0))));
+  const dueAmount = toMoney(
+    getMerchantDueFromNegativeStock(order?.productMeta?.stock, order?.productMeta?.price ?? order?.price).dueAmount
+  );
+  if (shortageQty <= 0 || dueAmount <= 0) return null;
+  return { shortageQty, dueAmount };
+};
+
+const renderShortageNote = (order, compact = false) => {
+  const meta = getShortageMeta(order);
+  if (!meta) return null;
+
+  return (
+    <div className={`rounded-lg border border-amber-200 bg-amber-50 text-amber-800 ${compact ? "mt-1.5 px-2 py-1.5 text-[11px]" : "mt-2 px-2.5 py-2 text-xs"}`}>
+      {compact
+        ? `Extra fulfilled: ${meta.shortageQty} pcs. 50% unpaid: $${meta.dueAmount.toFixed(2)}.`
+        : `Extra fulfilled by admin: ${meta.shortageQty} pcs. Merchant unpaid 50% amount: $${meta.dueAmount.toFixed(2)}.`}
     </div>
   );
 };
@@ -330,6 +353,7 @@ export default function MerchantOrders() {
                       Details
                     </button>
                   </div>
+                  {renderShortageNote(r)}
                   {renderSettlementNote(r)}
                 </div>
               </div>
@@ -386,6 +410,7 @@ export default function MerchantOrders() {
                                 {r.productMeta.category || "-"} · stock:{r.productMeta.stock} · sold:{r.productMeta.soldCount}
                               </div>
                             )}
+                            {renderShortageNote(r, true)}
                             {renderSettlementNote(r, true)}
                           </div>
                         </div>
@@ -485,6 +510,7 @@ export default function MerchantOrders() {
                 </div>
               ))}
             </div>
+            {renderShortageNote(selectedOrder)}
             {renderSettlementNote(selectedOrder)}
 
             {selectedOrder.productMeta && (

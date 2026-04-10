@@ -5,7 +5,7 @@ import { normalizeImageUrl } from "../../utils/imageUrl";
 import { ENABLE_DEMO_REVIEWS, DEMO_REVIEW_MERCHANT_IDS } from "../../config/env";
 import { getDemoReviewScenario } from "../../utils/demoReviews";
 
-const DEMO_REVIEW_MODE_ENABLED = import.meta.env.DEV && Boolean(ENABLE_DEMO_REVIEWS);
+const DEMO_REVIEW_MODE_ENABLED = Boolean(ENABLE_DEMO_REVIEWS);
 const DEMO_REVIEW_MERCHANT_ID_SET = new Set(
   (Array.isArray(DEMO_REVIEW_MERCHANT_IDS) ? DEMO_REVIEW_MERCHANT_IDS : [])
     .map((v) => String(v).trim())
@@ -20,9 +20,7 @@ const ProductCard = ({ product, onAddToCart, onProductClick, imageClassName = "h
   const [justAdded, setJustAdded] = useState(false);
   const [cooldown, setCooldown] = useState(false);
   const buttonRef = useRef(null);
-  const maxStock = Number(product?.stock);
-  const hasStockLimit = Number.isFinite(maxStock) && maxStock > 0;
-  const maxQty = hasStockLimit ? maxStock : 99;
+  const maxQty = 999;
   const price = Number(product?.price || 0);
   const oldPrice = Number(product?.oldPrice || 0);
   const hasOldPrice = Number.isFinite(oldPrice) && oldPrice > price && price > 0;
@@ -132,7 +130,7 @@ const ProductCard = ({ product, onAddToCart, onProductClick, imageClassName = "h
               Number(product?.stock || 0) > 0 ? "text-emerald-600" : "text-red-500"
             }`}
           >
-            Stock: {Math.max(0, Number(product?.stock || 0))}
+            Merchant stock: {Number(product?.stock || 0)}
           </p>
 
           <div className="flex items-center gap-1">

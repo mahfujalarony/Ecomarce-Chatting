@@ -315,7 +315,30 @@ function createSupportChatApp({ ioNamespace } = {}) {
 
 async function syncSupportChatDatabase() {
   await sequelize.authenticate();
-  await sequelize.sync();
+
+  const mode = String(config.dbSyncMode || "auto").toLowerCase();
+  if (mode === "skip" || mode === "none") {
+    return;
+  }
+  if (mode === "force") {
+    await sequelize.sync({ force: true });
+    return;
+  }
+  if (mode === "alter") {
+    await sequelize.sync({ alter: true });
+    return;
+  }
+  if (mode === "create" || mode === "safe") {
+    await sequelize.sync({ force: false });
+    return;
+  }
+
+  const queryInterface = sequelize.getQueryInterface();
+  const tables = await queryInterface.showAllTables();
+  const tableCount = Array.isArray(tables) ? tables.length : 0;
+  if (tableCount === 0) {
+    await sequelize.sync({ force: false });
+  }
 }
 
 async function startStandaloneServer() {

@@ -2,6 +2,7 @@
 const { Op } = require("sequelize");
 const User = require("../models/Authentication"); // তোমার User model
 const SubAdminPermission = require("../models/SubAdminPermission");
+const MerchentStore = require("../models/MerchentStore");
 const bcrypt = require("bcryptjs");
 const { toMoney2 } = require("../utils/money");
 const { appendAdminHistory } = require("../utils/adminHistory");
@@ -16,8 +17,6 @@ const ALLOWED_SUBADMIN_PERMISSIONS = new Set([
   "manage_merchant",
   "manage_users",
   "manage_support_chat",
-  "manage_balance_topup",
-  "manage_wallet",
 ]);
 
 const clampInt = (v, d) => {
@@ -62,12 +61,50 @@ exports.adminGetUsers = async (req, res) => {
       offset,
     });
 
+    const merchantIds = rows
+      .filter((user) => String(user.role || "") === "merchant")
+      .map((user) => Number(user.id))
+      .filter((id) => Number.isFinite(id) && id > 0);
+
+    let unpaidMap = new Map();
+    if (merchantIds.length > 0) {
+      const dueRows = await MerchentStore.findAll({
+        where: {
+          merchantId: merchantIds,
+          stock: { [Op.lt]: 0 },
+        },
+        attributes: ["merchantId", "stock", "price"],
+        raw: true,
+      });
+
+      unpaidMap = dueRows.reduce((map, row) => {
+        const merchantId = Number(row.merchantId || 0);
+        const shortageQty = Math.max(0, Math.abs(Math.min(0, Number(row.stock || 0))));
+        const dueAmount = Number((shortageQty * Number(row.price || 0) * 0.5).toFixed(2));
+        const current = map.get(merchantId) || { totalUnpaid: 0, totalShortageQty: 0 };
+        current.totalUnpaid += dueAmount;
+        current.totalShortageQty += shortageQty;
+        map.set(merchantId, current);
+        return map;
+      }, new Map());
+    }
+
+    const users = rows.map((row) => {
+      const json = row.toJSON();
+      const unpaid = unpaidMap.get(Number(row.id)) || { totalUnpaid: 0, totalShortageQty: 0 };
+      return {
+        ...json,
+        totalUnpaid: Number(Number(unpaid.totalUnpaid || 0).toFixed(2)),
+        totalShortageQty: Number(unpaid.totalShortageQty || 0),
+      };
+    });
+
     return res.json({
       success: true,
       page,
       limit,
       total: count,
-      users: rows,
+      users,
     });
   } catch (e) {
     return res.status(500).json({ success: false, message: "Server error" });

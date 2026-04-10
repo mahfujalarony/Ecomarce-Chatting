@@ -1,8 +1,5 @@
-const Merchant = require('../models/MerchantProfile');
 const User = require('./../models/Authentication');
-const jwt = require('jsonwebtoken');
 const { Op } = require("sequelize");
-const sequelize = require('../config/db');
 const Address = require('../models/Address');
 const OrderItem = require('../models/Order');
 const bcrypt = require('bcryptjs');

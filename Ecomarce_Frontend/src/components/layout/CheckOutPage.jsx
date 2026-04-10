@@ -204,11 +204,6 @@ const CheckoutPage = () => {
   };
 
   const handleIncrease = (id, currentQty) => {
-    const maxStock = stockMap[id];
-    if (maxStock !== undefined && currentQty >= maxStock) {
-      message.warning(`Height stock: ${maxStock}`);
-      return;
-    }
     dispatch(updateQty({ id, qty: currentQty + 1 }));
   };
 
@@ -463,7 +458,7 @@ const CheckoutPage = () => {
                         </div>
                         {stock !== undefined ? (
                           <div>
-                            <Text type="secondary">In stock: {Number(stock)}</Text>
+                            <Text type="secondary">Merchant stock now: {Number(stock)}</Text>
                           </div>
                         ) : null}
                       </div>
@@ -493,7 +488,6 @@ const CheckoutPage = () => {
                           size="small"
                           icon={<PlusOutlined />}
                           onClick={() => handleIncrease(item.id, item.qty)}
-                          disabled={stockMap[item.id] !== undefined && item.qty >= stockMap[item.id]}
                         />
                       </Space>
                       <Text strong>${Number(lineTotal).toFixed(2)}</Text>
